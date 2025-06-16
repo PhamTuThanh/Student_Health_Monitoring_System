@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -11,29 +11,29 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { getInfoUser, getPhysicalData, getAbnormalData } from '../services/api/api';
 
 const { width } = Dimensions.get('window'); // Kept, but not directly used in styles below
 
 interface StudentData {
   name: string;
   studentId: string;
-  class: string;
+  cohort: string;
   major: string;
   email: string;
   phone: string;
-  address: string;
-  dateOfBirth: string;
+  address: any;
+  dob: string;
   gender: string;
+  image?: string;
 }
 
 interface HealthMetrics {
   height: number;
   weight: number;
-  bmi: number;
-  bloodPressure: string;
+  bmi: string;
   heartRate: number;
-  temperature: number;
-  lastCheckup: string;
+  followDate: string;
 }
 
 interface HealthScores {
@@ -45,13 +45,13 @@ interface HealthScores {
 }
 
 interface AbnormalityRecord {
-  id: number;
+  _id: string;
+  studentId: string;
+  studentName: string;
+  doctorName: string;
   date: string;
-  doctor: string;
   symptoms: string[];
-  treatment: string;
-  status: string;
-  severity: string;
+  temporaryTreatment: string;
 }
 
 interface Appointment {
@@ -65,28 +65,32 @@ interface Appointment {
 
 const StudentHealthDashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState<string>('overview'); // This state is not used in the current render logic, but kept for future use
+  const [studentData, setStudentData] = useState<StudentData | null>(null);
+  const [healthMetrics, setHealthMetrics] = useState<HealthMetrics | null>(null);
+  const [abnormalityHistory, setAbnormalityHistory] = useState<AbnormalityRecord[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const studentData: StudentData = {
-    name: 'Phạm Tú Thành',
-    studentId: '6251021081',
-    class: 'cohort 60',
-    major: 'Logistics',
-    email: 'phamtuthanh@student.utc2.edu.vn',
-    phone: '0123456789',
-    address: '123 Đường ABC Phường DEF, Quận GHI',
-    dateOfBirth: '2004-07-01',
-    gender: 'Male',
-  };
+  useEffect(() => {
+    const fetchAll = async () => {
+      try {
+        const user = await getInfoUser();
+        setStudentData(user.userData);
 
-  const healthMetrics: HealthMetrics = {
-    height: 190,
-    weight: 69,
-    bmi: 19.1,
-    bloodPressure: '120/80',
-    heartRate: 72,
-    temperature: 36.5,
-    lastCheckup: '13-01-2024'
-  };
+        const physical = await getPhysicalData(user.userData.studentId);
+        const latestPhysical = Array.isArray(physical.data) && physical.data.length > 0
+          ? physical.data[physical.data.length - 1]
+          : null;
+        setHealthMetrics(latestPhysical);
+
+        const abnormal = await getAbnormalData(user.userData.studentId);
+        setAbnormalityHistory(Array.isArray(abnormal.data) ? abnormal.data : []);
+      } catch (err) {
+        Alert.alert('Error', 'Failed to load data');
+      }
+      setLoading(false);
+    };
+    fetchAll();
+  }, []);
 
   const healthScores: HealthScores = {
     physicalFitness: 85,
@@ -95,27 +99,6 @@ const StudentHealthDashboard: React.FC = () => {
     mental: 88,
     overall: 86
   };
-
-  const abnormalityHistory: AbnormalityRecord[] = [
-    {
-      id: 1,
-      date: '10/4/2003',
-      doctor: 'Dr. Thanh',
-      symptoms: ['Daze', 'Slow heartbeat', 'Nausea', 'Slow breathing', 'Paralysis', 'Trauma'],
-      treatment: 'sleep',
-      status: 'Resolved',
-      severity: 'Medium'
-    },
-    {
-      id: 2,
-      date: '15/3/2003',
-      doctor: 'Dr. Minh',
-      symptoms: ['Headache', 'Fatigue'],
-      treatment: 'Rest and medication',
-      status: 'Resolved',
-      severity: 'Low'
-    }
-  ];
 
   const upcomingAppointments: Appointment[] = [
     {
@@ -136,10 +119,11 @@ const StudentHealthDashboard: React.FC = () => {
     }
   ];
 
-  const getBMIStatus = (bmi: number) => {
-    if (bmi < 18.5) return { status: 'Underweight', color: '#3B82F6' };
-    if (bmi < 25) return { status: 'Normal', color: '#10B981' };
-    if (bmi < 30) return { status: 'Overweight', color: '#F59E0B' };
+  const getBMIStatus = (bmi: string) => {
+    const bmiNum = parseFloat(bmi);
+    if (bmiNum < 18.5) return { status: 'Underweight', color: '#3B82F6' };
+    if (bmiNum < 25) return { status: 'Normal', color: '#10B981' };
+    if (bmiNum < 30) return { status: 'Overweight', color: '#F59E0B' };
     return { status: 'Obese', color: '#EF4444' };
   };
 
@@ -164,7 +148,7 @@ const StudentHealthDashboard: React.FC = () => {
   };
 
   const handleViewFullHistory = () => {
-    Alert.alert('View Full History', 'Full medical history would be displayed here');
+    Alert.alert('View History', 'Full medical history would be displayed here');
   };
 
   const renderHealthMetricCard = (
@@ -217,6 +201,22 @@ const StudentHealthDashboard: React.FC = () => {
     </View>
   );
 
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <Text style={{ textAlign: 'center', marginTop: 40 }}>Loading...</Text>
+      </SafeAreaView>
+    );
+  }
+
+  if (!studentData || !healthMetrics) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <Text style={{ textAlign: 'center', marginTop: 40 }}>No data available</Text>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <LinearGradient
@@ -256,31 +256,31 @@ const StudentHealthDashboard: React.FC = () => {
                 colors={['#60A5FA', '#10B981']}
                 style={styles.avatar}
               >
-                <Text style={styles.avatarText}>{studentData.name.charAt(0)}</Text>
+                <Text style={styles.avatarText}>{studentData?.name?.charAt(0)}</Text>
               </LinearGradient>
               <View style={styles.profileInfo}>
                 <View style={styles.nameContainer}>
-                  <Text style={styles.studentName}>{studentData.name}</Text>
+                  <Text style={styles.studentName}>{studentData?.name}</Text>
                   <View style={styles.classBadge}>
-                    <Text style={styles.classBadgeText}>{studentData.class}</Text>
+                    <Text style={styles.classBadgeText}>{studentData?.cohort}</Text>
                   </View>
                 </View>
                 <View style={styles.studentDetails}>
                   <View style={styles.detailRow}>
                     <Ionicons name="book-outline" size={14} color="#6B7280" />
-                    <Text style={styles.detailText}>ID: {studentData.studentId}</Text>
+                    <Text style={styles.detailText}>ID: {studentData?.studentId}</Text>
                   </View>
                   <View style={styles.detailRow}>
                     <Ionicons name="person-outline" size={14} color="#6B7280" />
-                    <Text style={styles.detailText}>Major: {studentData.major}</Text>
+                    <Text style={styles.detailText}>Major: {studentData?.major}</Text>
                   </View>
                   <View style={styles.detailRow}>
                     <Ionicons name="calendar-outline" size={14} color="#6B7280" />
-                    <Text style={styles.detailText}>DOB: {studentData.dateOfBirth}</Text>
+                    <Text style={styles.detailText}>DOB: {studentData?.dob}</Text>
                   </View>
                   <View style={styles.detailRow}>
                     <Ionicons name="call-outline" size={14} color="#6B7280" />
-                    <Text style={styles.detailText}>{studentData.phone}</Text>
+                    <Text style={styles.detailText}>{studentData?.phone}</Text>
                   </View>
                 </View>
               </View>
@@ -291,19 +291,48 @@ const StudentHealthDashboard: React.FC = () => {
             </TouchableOpacity>
           </View>
 
+          {/* Abnormality Card */}
+          <View style={styles.card}>
+            <View style={styles.cardHeader}>
+              <View style={styles.cardTitleContainer}>
+                <Ionicons name="alert-circle-outline" size={20} color="#EF4444" />
+                <Text style={styles.cardTitle}>Recent Abnormalities</Text>
+              </View>
+            </View>
+            {abnormalityHistory.length === 0 ? (
+              <Text style={{ color: '#6B7280', textAlign: 'center', marginVertical: 12 }}>No abnormality records found.</Text>
+            ) : (
+              abnormalityHistory.slice(-1).map((record) => (
+                <View key={record._id} style={{ marginBottom: 12 }}>
+                  <Text style={{ fontWeight: 'bold', color: '#EF4444', marginBottom: 4 }}>
+                    {new Date(record.date).toLocaleDateString()} • Dr. {record.doctorName}
+                  </Text>
+                  <Text style={{ color: '#374151', marginBottom: 2 }}>
+                    <Text style={{ fontWeight: '600' }}>Symptoms: </Text>
+                    {record.symptoms.join(', ')}
+                  </Text>
+                  <Text style={{ color: '#374151' }}>
+                    <Text style={{ fontWeight: '600' }}>Treatment: </Text>
+                    {record.temporaryTreatment}
+                  </Text>
+                </View>
+              ))
+            )}
+          </View>
+
           {/* Health Metrics */}
           <View style={styles.metricsGrid}>
             {renderHealthMetricCard(
               'resize-outline', // Valid Ionicons name
               'Height',
-              `${healthMetrics.height} cm`,
+              `${healthMetrics?.height} cm`,
               'Normal range',
               '#3B82F6'
             )}
             {renderHealthMetricCard(
               'fitness-outline', // Valid Ionicons name
               'Weight',
-              `${healthMetrics.weight} kg`,
+              `${healthMetrics?.weight} kg`,
               'Normal range',
               '#10B981',
               { direction: 'down', text: '-2kg from last month' }
@@ -311,14 +340,14 @@ const StudentHealthDashboard: React.FC = () => {
             {renderHealthMetricCard(
               'bar-chart-outline', // Valid Ionicons name
               'BMI',
-              `${healthMetrics.bmi}`,
-              getBMIStatus(healthMetrics.bmi).status,
-              getBMIStatus(healthMetrics.bmi).color
+              `${healthMetrics?.bmi}`,
+              getBMIStatus(healthMetrics?.bmi || '0').status,
+              getBMIStatus(healthMetrics?.bmi || '0').color
             )}
             {renderHealthMetricCard(
               'heart-outline', // Valid Ionicons name
               'Heart Rate',
-              `${healthMetrics.heartRate} bpm`,
+              `${healthMetrics?.heartRate} bpm`,
               'Normal',
               '#EF4444'
             )}
@@ -398,16 +427,16 @@ const StudentHealthDashboard: React.FC = () => {
               </View>
               <TouchableOpacity style={styles.viewHistoryButton} onPress={handleViewFullHistory}>
                 <Ionicons name="eye-outline" size={16} color="white" />
-                <Text style={styles.viewHistoryButtonText}>View Full History</Text>
+                <Text style={styles.viewHistoryButtonText}>View History</Text>
               </TouchableOpacity>
             </View>
             <Text style={styles.lastCheckupText}>
-              Last checkup: {healthMetrics.lastCheckup}
+              Last checkup: {healthMetrics?.followDate}
             </Text>
             {/* Removed "space: 16" and replaced with marginBottom where needed */}
             <View style={styles.historyContainer}>
               {abnormalityHistory.map((record) => (
-                <View key={record.id} style={styles.historyRecord}>
+                <View key={record._id} style={styles.historyRecord}>
                   <View style={styles.historyHeader}>
                     <View style={styles.historyLeft}>
                       <View style={styles.historyIcon}>
@@ -415,23 +444,7 @@ const StudentHealthDashboard: React.FC = () => {
                       </View>
                       <View>
                         <Text style={styles.historyTitle}>Medical Examination</Text>
-                        <Text style={styles.historySubtitle}>{record.date} • {record.doctor}</Text>
-                      </View>
-                    </View>
-                    <View style={styles.historyBadges}>
-                      <View style={[
-                        styles.severityBadge,
-                        { backgroundColor: getSeverityColor(record.severity).bg }
-                      ]}>
-                        <Text style={[
-                          styles.severityBadgeText,
-                          { color: getSeverityColor(record.severity).text }
-                        ]}>
-                          {record.severity}
-                        </Text>
-                      </View>
-                      <View style={styles.statusBadge}>
-                        <Text style={styles.statusBadgeText}>{record.status}</Text>
+                        <Text style={styles.historySubtitle}>{record.date} • {record.doctorName}</Text>
                       </View>
                     </View>
                   </View>
@@ -448,13 +461,14 @@ const StudentHealthDashboard: React.FC = () => {
                     </View>
                     <View style={styles.treatmentContainer}>
                       <Text style={styles.historyLabel}>Treatment: </Text>
-                      <Text style={styles.treatmentText}>{record.treatment}</Text>
+                      <Text style={styles.treatmentText}>{record.temporaryTreatment}</Text>
                     </View>
                   </View>
                 </View>
               ))}
             </View>
           </View>
+      
         </ScrollView>
       </LinearGradient>
     </SafeAreaView>

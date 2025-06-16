@@ -6,7 +6,7 @@ import AddPrescription from "../../components/AddPrescription";
 const SYMPTOMS = [
   { group: "Consciousness", options: ["Daze", "Pass out", "Loss of consciousness", "Awake"] },
   { group: "Respiratory", options: ["Difficulty breathing", "Fast breathing", "Slow breathing"] },
-  { group: "Heart", options: ["Fast heartbeat", "Slow heartbeat", "High blood pressure", "Low blood pressure"] },
+  { group: "Heart", options: ["Fast heartbeat", "Slow heartbeat", "Higimage.pngh blood pressure", "Low blood pressure"] },
   { group: "Nervous system", options: ["Seizure", "Dizzy", "Stutter", "Paralysis"] },
   { group: "Gastrointestinal", options: ["Nausea", "Abdominal pain", "Vomiting", "Other"] },
   { group: "Temperature", options: ["Fever", "Chills", "Other"] },
@@ -71,7 +71,7 @@ export default function AbnormalityDetail() {
   };
 
   return (
-    <div className="w-full max-w-6xl m-5">
+    <div className="w-full max-w-6xl m-5 h-[calc(100vh-60px)] overflow-y-auto">
       {/* Header: Thông tin học sinh + Nút Thêm */}
       <div className="flex items-center justify-between mb-4 w-full">
         <div>

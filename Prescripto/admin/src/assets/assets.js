@@ -20,6 +20,7 @@ import delete_icon from './delete.png'
 import news_icon from './news.png'
 import student_icon from './student.png'
 import doctors_icon from './doctor.png'
+import calendar_icon from './calendar.png'
 
 export const assets = {
     add_icon,
@@ -43,8 +44,9 @@ export const assets = {
     delete_icon,
     news_icon,
     student_icon,
-    doctors_icon
-}
+    doctors_icon,
+    calendar_icon
+  }
 export const assets_icons ={
     home_icon: '🏠',
   appointment_icon: '📅',

@@ -172,7 +172,7 @@ const getPhysicalData = async (studentId) => {
     if (!token) {
         throw new Error("No authentication token found");
     }
-    const response = await axios.get(`${BACKEND_URL}/api/user/get-physical-fitness/${studentId}`, {
+    const response = await axios.get(`${BACKEND_URL}/api/user/data-physical/${studentId}`, {
         headers: { "Authorization": `Bearer ${token}` }
     });
     return response.data;
@@ -182,7 +182,7 @@ const getAbnormalData = async (studentId) => {
     if (!token) {
         throw new Error("No authentication token found");
     }
-    const response = await axios.get(`${BACKEND_URL}/api/user/data-physical/${studentId}`, {
+    const response = await axios.get(`${BACKEND_URL}/api/doctor/abnormality/${studentId}`, {
         headers: { "Authorization": `Bearer ${token}` }
     });
     return response.data;

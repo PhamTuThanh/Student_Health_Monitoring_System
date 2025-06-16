@@ -12,6 +12,7 @@ const Sidebar = () => {
   const [openNews, setOpenNews] = useState(false);
   const [openStudent, setOpenStudent] = useState(false);
   const [openDoctor, setOpenDoctor] = useState(false);
+  const [openCalendar, setOpenCalendar] = useState(false);
   const [isOpen, setIsOpen] = useState(true);
 
   useEffect(() => {
@@ -141,6 +142,16 @@ const Sidebar = () => {
               >
                 <StyledNavLink to="/add-news" icon={assets.news_icon} label="Add News" />
                 <StyledNavLink to="/news-list" icon={assets.news_icon} label="News List" />
+              </DropdownMenu>
+              <DropdownMenu
+                isOpen={isOpen}
+                icon={assets.calendar_icon}
+                label="Calendar Management"
+                isDropdownOpen={openCalendar}
+                toggleDropdown={() => setOpenCalendar(!openCalendar)}
+              >
+                <StyledNavLink to="/add-calendar" icon={assets.calendar_icon} label="Add Calendar" />
+                <StyledNavLink to="/calendar-list" icon={assets.calendar_icon} label="Calendar List" />
               </DropdownMenu>
             </ul>
           </div>

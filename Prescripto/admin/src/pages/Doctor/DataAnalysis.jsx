@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Users, Activity, UserCheck, TrendingUp } from 'lucide-react';
+import axios from 'axios';
 
 const DataAnalysis = () => {
   const [stats, setStats] = useState(null);
@@ -7,22 +8,33 @@ const DataAnalysis = () => {
 
   useEffect(() => {
     // Simulate API call with mock data
-    setTimeout(() => {
-      const mockStats = {
-        total: 1250,
-        daTDSK: 1100,
-        male: 680,
-        female: 570,
-        bmiStats: {
-          'Underweight': 125,
-          'Normal': 750,
-          'Overweight': 275,
-          'Obese': 100
-        }
-      };
-      setStats(mockStats);
-      setLoading(false);
-    }, 1000);
+    // setTimeout(() => {
+    //   const mockStats = {
+    //     total: 1250,
+    //     daTDSK: 1100,
+    //     male: 680,
+    //     female: 570,
+    //     bmiStats: {
+    //       'Underweight': 125,
+    //       'Normal': 750,
+    //       'Overweight': 275,
+    //       'Obese': 100
+    //     }
+    //   };
+    //   setStats(mockStats);
+    //   setLoading(false);
+    // }, 1000);
+    
+    axios.get('http://localhost:9000/api/doctor/physical-fitness-status')
+      .then(res => {
+        console.log('API response:', res.data);
+        setStats(res.data);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error('API error:', err);
+        setLoading(false);
+      });
   }, []);
 
   // Prepare chart data
@@ -257,7 +269,7 @@ const DataAnalysis = () => {
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold mb-2">
-                {stats ? ((stats.bmiStats?.Normal || 0) / stats.total * 100).toFixed(1) : 0}%
+                {stats ? ((stats.bmiStats?.["Bình thường"] || 0) / stats.total * 100).toFixed(1) : 0}%
               </div>
               <div className="text-sm opacity-90">Students with Normal BMI</div>
             </div>
