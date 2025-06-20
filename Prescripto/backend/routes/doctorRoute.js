@@ -1,6 +1,7 @@
 import express from 'express';
 import { doctorList, loginDoctor, appoinmentsDoctor, appoinmentComplete, appoinmentCancel, doctorDashboard, doctorProfile, updateDoctorProfile, savePhysicalFitness, getAllPhysicalFitness
-    , getAllAbnormality, createAbnormality, getAbnormalityByStudentId, getPhysicalFitness, importPhysicalFitnessExcel, addDrug, importDrugExcel, getDrugStock, deleteDrug, updateDrug, getUsersForChat } from '../controllers/doctorController.js'; 
+    , getAllAbnormality, createAbnormality, getAbnormalityByStudentId, getPhysicalFitness, importPhysicalFitnessExcel, addDrug, importDrugExcel, getDrugStock, deleteDrug, updateDrug, getUsersForChat
+    , getPhysicalFitnessBySession, getListExamSession } from '../controllers/doctorController.js'; 
 import { authDoctor } from '../middlewares/authDoctor.js';
 import upload from '../middlewares/multer.js';
 const doctorRouter = express.Router();
@@ -26,4 +27,6 @@ doctorRouter.get('/get-drug-stock', getDrugStock);
 doctorRouter.delete('/delete-drug/:drugId', deleteDrug);
 doctorRouter.put('/update-drug/:drugId', updateDrug);
 doctorRouter.get('/users-for-chat', authDoctor, getUsersForChat);
+doctorRouter.get('/physical-fitness-by-session', authDoctor, getPhysicalFitnessBySession);
+doctorRouter.get('/list-exam-sessions', getListExamSession);
 export default doctorRouter;

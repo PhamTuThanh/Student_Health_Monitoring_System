@@ -1,6 +1,10 @@
 import mongoose from "mongoose";
 
 const PhysicalFitnessSchema = new mongoose.Schema({
+  examSessionId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "ExamSession"
+  },
   studentId: String,
   gender: String,
   followDate: String,

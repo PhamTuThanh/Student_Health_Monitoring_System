@@ -1,5 +1,5 @@
 import express from 'express';
-import { addDoctor, allDoctors, loginAdmin, appoinmentsAdmin, appoinmentCancel, adminDashboard, deleteDoctor, addStudent, listStudents, importStudentsExcel, addNews, getNews, updateNews, deleteNews } from '../controllers/adminController.js';
+import { addDoctor, allDoctors, loginAdmin, appoinmentsAdmin, appoinmentCancel, adminDashboard, deleteDoctor, addStudent, listStudents, importStudentsExcel, addNews, getNews, updateNews, deleteNews, createExamSession } from '../controllers/adminController.js';
 import upload from '../middlewares/multer.js';
 import authAdmin from '../middlewares/authAdmin.js';
 import {changeAvailability } from '../controllers/doctorController.js';
@@ -22,5 +22,6 @@ adminRouter.post('/add-news', authAdmin,upload.single('file'), addNews)
 adminRouter.get('/get-news', authAdmin, getNews)
 adminRouter.post('/update-news', authAdmin, upload.single('file'), updateNews)
 adminRouter.post('/delete-news' , authAdmin, deleteNews)
+adminRouter.post('/add-exam-session', authAdmin, createExamSession)
 
 export default adminRouter;

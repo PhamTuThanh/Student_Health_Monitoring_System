@@ -5,6 +5,7 @@ import AppWrapper from "./redux/AppWrapper";
 import { Provider } from "react-redux";
 import store from "./redux/store";
 import { SocketContextProvider } from "./context/SocketContext";
+
 export default function RootLayout() {
   return (
     <Provider store={store}>

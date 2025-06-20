@@ -58,6 +58,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: "rgba(0, 0, 0, 0.5)",
+    marginTop: 50,
   },
   mainText: {
     color: "white",

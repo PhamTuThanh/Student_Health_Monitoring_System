@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useContext } from 'react';
-import { Search, Users, GraduationCap, Filter, User, Mail, Hash, Calendar, BookOpen } from 'lucide-react';
+import { Search, Users, GraduationCap, Filter, User, Mail, Hash, Calendar, BookOpen, ChevronLeft, ChevronRight } from 'lucide-react';
 import axios from 'axios';
 import { AdminContext } from '../../context/AdminContext';
 
@@ -28,8 +28,11 @@ const StudentList = () => {
   const [selectedMajor, setSelectedMajor] = useState('');
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [studentsPerPage] = useState(10);
 
   useEffect(() => {
+    setCurrentPage(1);
     fetchStudents();
   }, [selectedCohort, selectedMajor]);
 
@@ -57,8 +60,13 @@ const StudentList = () => {
     setSelectedMajor('');
   };
 
+  const indexOfLastStudent = currentPage * studentsPerPage;
+  const indexOfFirstStudent = indexOfLastStudent - studentsPerPage;
+  const currentStudents = students.slice(indexOfFirstStudent, indexOfLastStudent);
+  const totalPages = Math.ceil(students.length / studentsPerPage);
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 ml-10 overflow-auto ">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 ml-10 h-[calc(100vh-40px)] overflow-auto ">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         {/* <div className="mb-8">
@@ -73,17 +81,17 @@ const StudentList = () => {
 
         {/* Filters Card */}
         <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-6">
-          <div className="flex items-center gap-2 mb-4">
+          {/* <div className="flex items-center gap-2 mb-4">
             <Filter className="w-5 h-5 text-gray-600" />
             <h2 className="text-lg font-semibold text-gray-800">Filter Students</h2>
-          </div>
+          </div> */}
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+              {/* <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
                 <Calendar className="w-4 h-4" />
                 Cohort
-              </label>
+              </label> */}
               <select
                 className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-gray-50 hover:bg-white"
                 value={selectedCohort}
@@ -99,10 +107,10 @@ const StudentList = () => {
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+              {/* <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
                 <GraduationCap className="w-4 h-4" />
                 Major
-              </label>
+              </label> */}
               <select
                 className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-gray-50 hover:bg-white"
                 value={selectedMajor}
@@ -203,11 +211,11 @@ const StudentList = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {students.map((student, idx) => (
+                  {currentStudents.map((student, idx) => (
                     <tr key={student._id} className="hover:bg-gray-50 transition-colors duration-150">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center justify-center w-8 h-8 bg-blue-100 text-blue-600 rounded-full text-sm font-medium">
-                          {idx + 1}
+                          {indexOfFirstStudent + idx + 1}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -242,6 +250,31 @@ const StudentList = () => {
               </table>
             )}
           </div>
+          {totalPages > 0 && (
+            <div className="p-6 border-t border-gray-100 flex items-center justify-between">
+              <span className="text-sm text-gray-600">
+                Page <span className="font-medium">{currentPage}</span> of <span className="font-medium">{totalPages}</span>
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  className="flex items-center justify-center px-3 h-8 text-sm font-medium text-gray-600 bg-white rounded-lg border border-gray-200 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <ChevronLeft className="w-4 h-4 mr-1" />
+                  Previous
+                </button>
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages}
+                  className="flex items-center justify-center px-3 h-8 text-sm font-medium text-gray-600 bg-white rounded-lg border border-gray-200 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Next
+                  <ChevronRight className="w-4 h-4 ml-1" />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

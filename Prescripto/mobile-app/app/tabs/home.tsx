@@ -8,7 +8,9 @@ import {
   SafeAreaView,
   Dimensions, // Not explicitly used but kept for context if needed
   Alert,
+  Image,
 } from 'react-native';
+import { assets } from '../../assets/images/assets.js';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { getInfoUser, getPhysicalData, getAbnormalData } from '../services/api/api';
@@ -226,12 +228,10 @@ const StudentHealthDashboard: React.FC = () => {
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.headerLeft}>
-            <LinearGradient
-              colors={['#3B82F6', '#10B981']}
-              style={styles.logoContainer}
-            >
-              <Ionicons name="medical" size={20} color="white" />
-            </LinearGradient>
+            <View style={styles.logoContainer}>
+              <Image source={assets.logo_utc2} style={{width: 40, height: 40}} />
+            </View>
+            
             <View style={styles.headerText}>
               <Text style={styles.headerTitle}>My Health Dashboard</Text>
               <Text style={styles.headerSubtitle}>UTC2 Health Management System</Text>
@@ -479,6 +479,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F8FAFC',
+    marginTop: 30,
   },
   gradient: {
     flex: 1,
@@ -507,6 +508,7 @@ const styles = StyleSheet.create({
   },
   headerText: {
     flex: 1,
+    paddingRight: 16,
   },
   headerTitle: {
     fontSize: 18,
@@ -522,8 +524,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   notificationButton: {
-    padding: 8,
-    marginRight: 8,
+    // padding: 8,
+    paddingRight: 20,
+
+    marginRight: 16,
     position: 'relative',
   },
   notificationBadge: {

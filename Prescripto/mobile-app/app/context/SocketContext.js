@@ -17,7 +17,7 @@ export const SocketContextProvider = ({ children }) => {
 	useEffect(() => {
 		if (!loading && user?.id) {
 			const socketInstance = io(BACKEND_URL, {
-				transports: ['websocket', 'polling'],
+			//	transports: ['websocket', 'polling'],
 				query: {
 					userId: user.id,
 				},

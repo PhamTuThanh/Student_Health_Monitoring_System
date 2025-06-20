@@ -8,6 +8,8 @@ import appoinmentModel from './../models/appoinmentModel.js';
 import userModel from './../models/userModel.js'; // Use userModel for students
 import xlsx from 'xlsx';
 import News from '../models/newsModel.js';
+import ExamSession from "../models/examSessionModel.js";
+import physicalFitnessModel from "../models/physicalFitnessModel.js";
 
 
 //API for adding doctor
@@ -367,4 +369,47 @@ const deleteNews = async (req, res) => {
         res.status(500).json({ success: false, message: error.message });
     }
 }
-export { addDoctor, loginAdmin, allDoctors, appoinmentsAdmin, appoinmentCancel, adminDashboard, deleteDoctor, addStudent, listStudents, importStudentsExcel, addNews, getNews, updateNews, deleteNews };
+// Tạo exam session mới và tạo bản ghi rỗng cho tất cả sinh viên
+const createExamSession = async (req, res) => {
+  try {
+    const { examSessionName, examSessionDate, examSessionAcademicYear, examSessionDescription } = req.body;
+    // 1. Tạo exam session mới
+    const examSession = await ExamSession.create({
+      examSessionName,
+      examSessionDate,
+      examSessionAcademicYear,
+      examSessionDescription,
+      createdBy: req.user?._id || null,
+    });
+
+    // 2. Lấy danh sách tất cả sinh viên
+    const students = await userModel.find({ role: {$in: ["student", "user"]}});
+
+    // 3. Tạo bản ghi rỗng cho từng sinh viên
+    const emptyRecords = students.map((student) => ({
+      studentId: student._id,
+      examSessionId: examSession._id,
+      // Các trường dữ liệu sức khỏe để rỗng hoặc mặc định
+      height: "",
+      weight: "",
+      zScoreCC: "",
+      danhGiaCC: "",
+      zScoreCN: "",
+      danhGiaCN: "",
+      zScoreCNCc: "",
+      bmi: "",
+      danhGiaBMI: "",
+      systolic: "",
+      diastolic: "",
+      danhGiaTTH: "",
+      heartRate: "",
+      danhGiaHeartRate: "",
+    }));
+    await physicalFitnessModel.insertMany(emptyRecords);
+    res.status(201).json({ success: true, message: "Tạo lần khám và bản ghi rỗng thành công!", examSession });
+  } catch (error) {
+    console.error("Error creating exam session:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+export { addDoctor, loginAdmin, allDoctors, appoinmentsAdmin, appoinmentCancel, adminDashboard, deleteDoctor, addStudent, listStudents, importStudentsExcel, addNews, getNews, updateNews, deleteNews, createExamSession };

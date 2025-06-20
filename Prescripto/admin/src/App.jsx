@@ -25,6 +25,7 @@ import AddDrug from './pages/Doctor/AddDrug';
 import AddNews from './pages/Admin/AddNews';
 import DoctorChat from './pages/Doctor/DoctorChat';
 import NewsList from './pages/Admin/NewsList';
+import AddExamSession from './pages/Admin/AddExamSession';
 
 const App = () => {
   const { aToken } = useContext(AdminContext)
@@ -77,7 +78,7 @@ const App = () => {
               : 'ml-[70px]'
           }`}
         >
-          <div className="min-h-screen p-4"> 
+          <div className="min-h-screen p-4 "> 
             <Routes>
               {/* admin route */}
               <Route path='/' element={<></>}/>
@@ -89,12 +90,13 @@ const App = () => {
               <Route path='/student-list' element={<StudentList/>}/>
               <Route path='/add-news' element={<AddNews/>}/>
               <Route path='/news-list' element={<NewsList/>}/>
-                      
+              <Route path='/add-exam-session' element={<AddExamSession/>}/>
+
               {/* doctor route */}
               <Route path='/doctor-dashboard' element={<DoctorDashboard/>}/>
               <Route path='/doctor-appoinments' element={<DoctorAppoinments/>}/>
               <Route path='/doctor-profile' element={<DoctorProfile/>}/>
-              <Route path='/add-physical-fitness' element={<PhysicalFitness/>}/>
+              <Route path='/physical-fitness-by-session' element={<PhysicalFitness/>}/>
               <Route path="/abnormality" element={<Abnormality />} />
               <Route path="/doctor/abnormality/:id" element={<AbnormalityDetail />} />
               <Route path="/data_analysis" element={<DataAnalysis/>}/>

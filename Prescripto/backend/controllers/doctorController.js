@@ -9,6 +9,8 @@ import Abnormality from '../models/abnormalityModel.js';
 import xlsx from 'xlsx';
 import drugStockModel from '../models/drugStockModel.js';
 import cloudinary from 'cloudinary';
+import examSessionModel from '../models/examSessionModel.js';
+import mongoose from 'mongoose';
 
 const changeAvailability = async (req, res) => {
     try {
@@ -240,9 +242,9 @@ const savePhysicalFitness = async (req, res) => {
     data.danhGiaTTH = getDanhGiaTTH(systolic, diastolic);
     data.danhGiaHeartRate = getDanhGiaHeartRate(heartRate);
     data.zScoreCNCc = (data.zScoreCN && data.zScoreCC) ? (parseFloat(data.zScoreCN) - parseFloat(data.zScoreCC)).toFixed(2) : "";
-
+ 
     await physicalFitnessModel.findOneAndUpdate(
-      { studentId: data.studentId, followDate: data.followDate },
+      { studentId: data.studentId, followDate: data.followDate, examSessionId: data.examSessionId },
       data,
       { upsert: true, new: true }
     );
@@ -294,33 +296,170 @@ const getPhysicalFitness = async (req, res) => {
 };
 const importPhysicalFitnessExcel = async (req, res) => {
   try {
-    if (!req.file) return res.status(400).json({ success: false, message: 'No file uploaded' });
+    const { examSessionId } = req.body;
+    
+    // Validate examSessionId
+    if (!examSessionId) {
+      return res.status(400).json({ success: false, message: 'Exam session ID is required' });
+    }
+    
+    // Validate file upload
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'No file uploaded' });
+    }
+
+    // Validate examSessionId exists
+    const examSession = await examSessionModel.findById(examSessionId);
+    if (!examSession) {
+      return res.status(400).json({ success: false, message: 'Exam session not found' });
+    }
+
     const xlsx = (await import('xlsx')).default || require('xlsx');
     const workbook = xlsx.readFile(req.file.path);
     const sheetName = workbook.SheetNames[0];
     const sheet = workbook.Sheets[sheetName];
     let data = xlsx.utils.sheet_to_json(sheet);
-    data = data.map(row => {
+
+    // Validate data structure
+    if (!data || data.length === 0) {
+      return res.status(400).json({ success: false, message: 'Excel file is empty or invalid format' });
+    }
+
+    // Validate required fields
+    const requiredFields = ['studentId', 'height', 'weight'];
+    const invalidRows = [];
+    const validData = [];
+
+    data.forEach((row, index) => {
+      const missingFields = requiredFields.filter(field => !row[field]);
+      if (missingFields.length > 0) {
+        invalidRows.push({
+          row: index + 1,
+          missingFields,
+          studentId: row.studentId || 'N/A'
+        });
+      } else {
+        validData.push(row);
+      }
+    });
+
+    if (invalidRows.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Some rows are missing required fields',
+        invalidRows
+      });
+    }
+
+    // Check for duplicates and prepare data
+    const processedData = [];
+    const duplicateStudentIds = [];
+    const existingRecords = await physicalFitnessModel.find({ examSessionId });
+
+    for (const row of validData) {
+      const studentId = String(row.studentId).replace(/^['"]+|['"]+$/g, '').trim();
+      
+      // Check if record already exists
+      const existingRecord = existingRecords.find(record => 
+        String(record.studentId) === studentId
+      );
+
+      if (existingRecord) {
+        duplicateStudentIds.push(studentId);
+        continue;
+      }
+
+      // Calculate derived fields
       const height = parseFloat(row.height) || 0;
       const weight = parseFloat(row.weight) || 0;
       const systolic = parseFloat(row.systolic) || 0;
       const diastolic = parseFloat(row.diastolic) || 0;
       const heartRate = parseFloat(row.heartRate) || 0;
-      row.zScoreCC = calculateZScoreCC(height);
-      row.danhGiaCC = getDanhGiaCC(row.zScoreCC);
-      row.zScoreCN = calculateZScoreCN(weight);
-      row.danhGiaCN = getDanhGiaCN(row.zScoreCN);
-      row.bmi = calculateBMI(weight, height);
-      row.danhGiaBMI = getDanhGiaBMI(row.bmi);
-      row.danhGiaTTH = getDanhGiaTTH(systolic, diastolic);
-      row.danhGiaHeartRate = getDanhGiaHeartRate(heartRate);
-      row.zScoreCNCc = (row.zScoreCN && row.zScoreCC) ? (parseFloat(row.zScoreCN) - parseFloat(row.zScoreCC)).toFixed(2) : "";
-      return row;
-    });
-    await physicalFitnessModel.insertMany(data);
-    res.json({ success: true, message: 'Import thành công!', count: data.length });
+
+      const zScoreCC = calculateZScoreCC(height);
+      const zScoreCN = calculateZScoreCN(weight);
+      const bmi = calculateBMI(weight, height);
+      const zScoreCNCc = (zScoreCN && zScoreCC) 
+        ? (parseFloat(zScoreCN) - parseFloat(zScoreCC)).toFixed(2) 
+        : "";
+
+      processedData.push({
+        studentId,
+        examSessionId,
+        gender: row.gender || "",
+        followDate: row.followDate || "",
+        height,
+        weight,
+        zScoreCC,
+        danhGiaCC: getDanhGiaCC(zScoreCC),
+        zScoreCN,
+        danhGiaCN: getDanhGiaCN(zScoreCN),
+        zScoreCNCc,
+        bmi,
+        danhGiaBMI: getDanhGiaBMI(bmi),
+        systolic,
+        diastolic,
+        danhGiaTTH: getDanhGiaTTH(systolic, diastolic),
+        heartRate,
+        danhGiaHeartRate: getDanhGiaHeartRate(heartRate),
+      });
+    }
+
+    // Insert new records
+    let insertedCount = 0;
+    if (processedData.length > 0) {
+      const result = await physicalFitnessModel.insertMany(processedData);
+      insertedCount = result.length;
+    }
+
+    // Clean up uploaded file
+    const fs = await import('fs');
+    if (fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
+
+    // Return response with detailed information
+    const response = {
+      success: true,
+      message: `Import completed successfully!`,
+      summary: {
+        totalRows: data.length,
+        validRows: validData.length,
+        insertedCount,
+        duplicateCount: duplicateStudentIds.length,
+        skippedCount: invalidRows.length
+      }
+    };
+
+    if (duplicateStudentIds.length > 0) {
+      response.duplicates = duplicateStudentIds;
+    }
+
+    if (invalidRows.length > 0) {
+      response.invalidRows = invalidRows;
+    }
+
+    res.json(response);
+
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    console.error('Import Physical Fitness Excel Error:', error);
+    
+    // Clean up uploaded file on error
+    if (req.file && req.file.path) {
+      try {
+        const fs = await import('fs');
+        if (fs.existsSync(req.file.path)) {
+          fs.unlinkSync(req.file.path);
+        }
+      } catch (cleanupError) {
+        console.error('Error cleaning up file:', cleanupError);
+      }
+    }
+    
+    res.status(500).json({ 
+      success: false, 
+      message: 'Import failed: ' + error.message 
+    });
   }
 };
 //-----------------controller for abnormality-----------------
@@ -502,7 +641,31 @@ const getUsersForChat = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+// Lấy danh sách physical fitness theo examSessionId
+const getPhysicalFitnessBySession = async (req, res) => {
+  try {
+    const { examSessionId } = req.query;
+    if (!examSessionId) {
+      return res.status(400).json({ success: false, message: "Missing examSessionId" });
+    }
+    // Populate studentId để lấy thông tin sinh viên nếu cần
+    const data = await physicalFitnessModel.find({ 
+      examSessionId: new mongoose.Types.ObjectId(examSessionId)
+    }).populate('studentId');
+    res.json({ success: true, data });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+const getListExamSession = async (req, res) => {
+  try {
+    const data = await examSessionModel.find({}).sort({ examSessionCreatedAt: -1 });
+    res.json({ success: true, data });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
 export { changeAvailability, doctorList, loginDoctor, appoinmentsDoctor, appoinmentComplete, appoinmentCancel, doctorDashboard, doctorProfile,
      updateDoctorProfile, refundStatus, savePhysicalFitness, getAllPhysicalFitness, getAllAbnormality, createAbnormality, getAbnormalityByStudentId, getPhysicalFitness,
-     importPhysicalFitnessExcel, addDrug, importDrugExcel, getDrugStock, deleteDrug, updateDrug, getUsersForChat };
+     importPhysicalFitnessExcel, addDrug, importDrugExcel, getDrugStock, deleteDrug, updateDrug, getUsersForChat, getPhysicalFitnessBySession, getListExamSession };
 

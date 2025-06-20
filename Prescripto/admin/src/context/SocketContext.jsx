@@ -20,7 +20,7 @@ export const SocketContextProvider = ({ children }) => {
 			console.log("Connecting to backend URL:", BACKEND_URL);
 
 			const socket = io(BACKEND_URL, {
-				transports: ['websocket', "polling"],
+			//	transports: ['websocket', "polling"],
 				query: {
 					userId: userData._id,
 				},

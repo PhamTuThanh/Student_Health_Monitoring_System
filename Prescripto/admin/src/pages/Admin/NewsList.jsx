@@ -174,9 +174,9 @@ const NewsList = () => {
         <div className="max-w-7xl mx-auto px-6 py-6">
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
             <div className="space-y-2">
-              <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 bg-clip-text text-transparent">
+              <h2 className="text-4xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 bg-clip-text text-transparent">
                 News Management
-              </h1>
+              </h2>
              
             </div>
             

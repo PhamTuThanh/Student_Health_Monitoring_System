@@ -12,7 +12,7 @@ export default function Abnormality() {
   const [classes, setClasses] = useState([]);
   const [abnormalMap, setAbnormalMap] = useState({});
   const [currentPage, setCurrentPage] = useState(1);
-  const rowsPerPage = 20;
+  const rowsPerPage = 10;
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -65,7 +65,7 @@ export default function Abnormality() {
   return (
     <div className='w-full max-w-6xl m-5'>
     <div className="scale-[0.75] origin-top-left w-[133.33%] px-8">
-      <h2 className="mb-6 font-extrabold text-3xl text-gray-800 tracking-tight text-center">Abnormality Management</h2>
+      {/* <h2 className="mb-6 font-extrabold text-3xl text-gray-800 tracking-tight text-center">Abnormality Management</h2> */}
       {/* Filter Section */}
       <div className="mb-6 flex flex-wrap gap-6 items-center justify-center bg-[#f8fafc] rounded-xl py-4 px-8 shadow-sm border border-[#e5e7eb]">
         <div className="flex items-center gap-2">

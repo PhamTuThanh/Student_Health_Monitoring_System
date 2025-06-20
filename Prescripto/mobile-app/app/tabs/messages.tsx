@@ -720,7 +720,7 @@ const Messages = () => {
       try {
         const data = await messageSidebar();
         setDoctors(data.data || data);
-        console.log("data for doctors", data);
+      //  console.log("data for doctors", data);
       } catch (error) {
         console.log("error", error);
       } finally {
@@ -777,15 +777,15 @@ const Messages = () => {
             setMessages((prev) => [...prev, response]);
             setMessage("");
             
-            if (socket) {
-                socket.emit("newMessage", {
-                    message,
-                    receiverId: selectedDoctor._id,
-                    senderId: response.senderId,
-                    _id: response._id,
-                    createdAt: response.createdAt
-                });
-            }
+            // if (socket) {
+            //     socket.emit("newMessage", {
+            //         message,
+            //         receiverId: selectedDoctor._id,
+            //         senderId: response.senderId,
+            //         _id: response._id,
+            //         createdAt: response.createdAt
+            //     });
+            // }
         }
     } catch (error) {
         console.error("Error sending message:", error);
@@ -991,7 +991,7 @@ const Messages = () => {
             </View>
           </View>
           
-          <View style={styles.chatHeaderActions}>
+          {/* <View style={styles.chatHeaderActions}>
             <TouchableOpacity style={styles.chatActionButton}>
               <Text style={styles.chatActionIcon}>📞</Text>
             </TouchableOpacity>
@@ -1001,7 +1001,7 @@ const Messages = () => {
             <TouchableOpacity style={styles.chatActionButton}>
               <Text style={styles.chatActionIcon}>ℹ️</Text>
             </TouchableOpacity>
-          </View>
+          </View> */}
         </View>
 
         {/* Enhanced Messages Container */}
@@ -1109,6 +1109,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F5F7FA',
+    marginTop: 30,
   },
   
   // Enhanced Chat List Styles
@@ -1501,6 +1502,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
+    maxHeight: 60,
   },
   attachButton: {
     padding: 8,
@@ -1516,10 +1518,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     marginHorizontal: 8,
+  
   },
   textInput: {
     fontSize: 16,
     maxHeight: 100,
+    minHeight: 40,
     color: '#263238',
     textAlignVertical: 'center',
   },

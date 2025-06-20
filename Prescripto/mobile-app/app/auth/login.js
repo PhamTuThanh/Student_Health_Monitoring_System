@@ -120,7 +120,7 @@ export default function Login() {
         </View>
 
         <Text style={styles.title}>Welcome Back</Text>
-        <Text style={styles.subtitle}>Sign in to continue your learning journey</Text>
+        <Text style={styles.subtitle}>Sign in to continue your health tracking journey</Text>
         
         <Formik
           initialValues={{ email: "", password: "" }}

@@ -12,6 +12,7 @@ const Messages = () => {
 	const lastMessageRef = useRef();
 
 	useEffect(() => {
+		console.log("Messages component rendered, messages:", messages);
 		setTimeout(() => {
 			lastMessageRef.current?.scrollIntoView({ block: "end" });
 		}, 100);

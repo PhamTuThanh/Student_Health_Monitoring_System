@@ -12,6 +12,7 @@ import { useRouter } from "expo-router";
 import { logoutAction } from "../redux/authSlice";
 import ProtectedRoute from "../../components/ProtectedRoute";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Ionicons } from "@expo/vector-icons";
 
 export default function Profile() {
   const router = useRouter();
@@ -39,7 +40,7 @@ export default function Profile() {
               style={styles.avatar}
             />
             <View style={styles.cameraIcon}>
-              <Text style={{ color: "white", fontSize: 12 }}>📷</Text>
+              <Ionicons name="camera-outline" size={20} color="white" />
             </View>
           </View>
           <Text style={styles.profileTitle}>THÔNG TIN CÁ NHÂN</Text>
@@ -80,6 +81,7 @@ const styles = StyleSheet.create({
   scrollContainer: {
     backgroundColor: "#fff",
     paddingBottom: 40,
+    marginTop: 30,
   },
   header: {
     backgroundColor: "#FFD700",
@@ -154,7 +156,8 @@ const styles = StyleSheet.create({
   infoItem: {
     fontSize: 16,
     marginBottom: 2,
-    color: "blue",
+    color: "#043d64",
+    fontWeight: "bold",
   },
   infoValue: {
     fontWeight: "normal",

@@ -150,8 +150,8 @@ const Sidebar = () => {
                 isDropdownOpen={openCalendar}
                 toggleDropdown={() => setOpenCalendar(!openCalendar)}
               >
-                <StyledNavLink to="/add-calendar" icon={assets.calendar_icon} label="Add Calendar" />
-                <StyledNavLink to="/calendar-list" icon={assets.calendar_icon} label="Calendar List" />
+                <StyledNavLink to="/add-exam-session" icon={assets.calendar_icon} label="Add Exam Session" />
+                <StyledNavLink to="/exam-session-list" icon={assets.calendar_icon} label="Exam Session List" />
               </DropdownMenu>
             </ul>
           </div>
@@ -174,7 +174,8 @@ const Sidebar = () => {
                 isDropdownOpen={openTrackHealth}
                 toggleDropdown={() => setOpenTrackHealth(!openTrackHealth)}
               >
-                <StyledNavLink to="/add-physical-fitness" label="Physical Fitness" />
+               {/* <StyledNavLink to="/add-physical-fitness" label="Physical Fitness" /> */}
+                <StyledNavLink to="/physical-fitness-by-session" label="Physical Fitness" />
                 <StyledNavLink to="/abnormality" label="Abnormality" />
               </DropdownMenu>
               <DropdownMenu

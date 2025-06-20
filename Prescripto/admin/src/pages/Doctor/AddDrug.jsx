@@ -307,6 +307,7 @@ function AddDrug({ onClose, onSuccess }) {
             <ImportExcelModal
                 open={showModal}
                 onClose={() => setShowModal(false)}
+                type="drugs"
             />
         </div>
     </div>

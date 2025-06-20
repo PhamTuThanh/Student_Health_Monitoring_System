@@ -28,11 +28,11 @@ export default function RootLayout() {
                     <FontAwesome name="bullhorn" color={color} size={24} />
                 ),
             }} />
-            <Tabs.Screen name="settings" options={{headerShown: false, title: "Settings",
+            {/* <Tabs.Screen name="settings" options={{headerShown: false, title: "Settings",
                 tabBarIcon: ({ color}) => (
                     <FontAwesome name="gear" color={color} size={24} />
                 ),
-            }} />
+            }} /> */}
         </Tabs>
     )
 }
