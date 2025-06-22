@@ -30,6 +30,7 @@ const StudentList = () => {
   const [loading, setLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [studentsPerPage] = useState(10);
+  
 
   useEffect(() => {
     setCurrentPage(1);
@@ -41,8 +42,7 @@ const StudentList = () => {
     try {
       const { data } = await axios.post(
         backendUrl + '/api/admin/list-students',
-        { cohort: selectedCohort, major: selectedMajor },
-        { headers: { aToken } }
+        { cohort: selectedCohort, major: selectedMajor }
       );
       if (data.success) {
         setStudents(data.students);

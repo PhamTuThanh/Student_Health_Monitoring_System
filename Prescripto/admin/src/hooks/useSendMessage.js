@@ -1,43 +1,29 @@
 import { useState } from "react";
 import useConversation from "../zustand/useConversation";
 import toast from "react-hot-toast";
+import axios from "axios";
 
 const useSendMessage = () => {
 	const [loading, setLoading] = useState(false);
 	const { messages, setMessages, selectedConversation } = useConversation();
     const backendUrl = import.meta.env.VITE_BACKEND_URL;
-    const dToken = localStorage.getItem("dToken");
 
 	const sendMessage = async (message) => {
+		if (!selectedConversation?._id) return;
 		setLoading(true);
 		try {
-			// Kiểm tra xem token có tồn tại không
-			if (!dToken) {
-				throw new Error("Authentication token is missing. Please log in again.");
-			}
+			const res = await axios.post(
+				`${backendUrl}/api/messages/send/${selectedConversation._id}`, 
+				{ message }
+			);
 			
-			console.log("Using token for send:", dToken);
-			
-			const res = await fetch(`${backendUrl}/api/messages/send/${selectedConversation._id}`, {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-					"Authorization": `Bearer ${dToken}`
-				},
-				body: JSON.stringify({ message }),
-			});
-			
-			if (!res.ok) {
-				throw new Error(`Request failed with status ${res.status}: ${res.statusText}`);
-			}
-			
-			const data = await res.json();
-			if (data.error) throw new Error(data.error);
+			if (res.data.error) throw new Error(res.data.error);
 
-			setMessages([...messages, data]);
+			setMessages([...messages, res.data]);
+
 		} catch (error) {
-			console.error("Send message error:", error);
-			toast.error(error.message);
+			const errorMessage = error.response?.data?.message || error.message;
+			toast.error(errorMessage);
 		} finally {
 			setLoading(false);
 		}

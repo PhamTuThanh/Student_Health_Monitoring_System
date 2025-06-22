@@ -5,9 +5,11 @@ import { DoctorContext } from '../../context/DoctorContext';
 import { toast } from 'react-toastify';
 import ImportExcelModal from '../../components/ImportExcelModal';
 import { Upload, Plus, FileSpreadsheet, Camera, Package, Calendar, User, FileText, Tag, Hash } from 'lucide-react';
+import { useNavbarControl } from '../../hooks/useNavbarControl';
 
 function AddDrug({ onClose, onSuccess }) {
     const { dToken, backendUrl } = useContext(DoctorContext)
+    const { hideNavbar, showNavbar } = useNavbarControl(false);
     const [drugImage, setDrugImage] = useState(null);
     const [drugName, setDrugName] = useState('');
     const [drugCode, setDrugCode] = useState('');
@@ -53,7 +55,7 @@ function AddDrug({ onClose, onSuccess }) {
             formData.forEach((value, key) => {
                 console.log(`${key} : ${value}`);
             })
-            const res = await axios.post(`${backendUrl}/api/doctor/add-drug`, formData, { headers: { dToken } })
+            const res = await axios.post(`${backendUrl}/api/doctor/add-drug`, formData)
             if (res.data.success) {
                 toast.success(res.data.message);
                 setDrugImage(false);
@@ -65,6 +67,7 @@ function AddDrug({ onClose, onSuccess }) {
                 setExpiryDate('');
                 setSupplierName('');
                 setNotes('');
+                showNavbar();
                 onSuccess?.();
             } else {
                 toast.error(res.data.message);
@@ -77,7 +80,7 @@ function AddDrug({ onClose, onSuccess }) {
     };
 
  return (
-    <div className="bg-gradient-to-br from-blue-50 via-white to-purple-50 mt-16">
+    <div className="bg-gradient-to-br from-blue-50 via-white to-purple-50">
         <div className="max-w-4xl mx-auto">
             {/* Header */}
             {/* <div className="flex items-center justify-between mb-8">
@@ -89,7 +92,7 @@ function AddDrug({ onClose, onSuccess }) {
 
             <div
               className="bg-white rounded-2xl shadow-lg overflow-hidden"
-              style={{ maxHeight: "80vh", overflowY: "auto" }}
+              style={{ maxHeight: "90vh", overflowY: "auto" }}
             >
               {/* Image Upload Section */}
               <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-8 border-b">
@@ -130,7 +133,10 @@ function AddDrug({ onClose, onSuccess }) {
                           <button
                               type="button"
                               className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl font-medium transition shadow-lg"
-                              onClick={() => setShowModal(true)}
+                              onClick={() => {
+                                  hideNavbar();
+                                  setShowModal(true);
+                              }}
                           >
                               <FileSpreadsheet className="w-5 h-5" />
                               Import Excel
@@ -298,6 +304,33 @@ function AddDrug({ onClose, onSuccess }) {
                                 rows={4} 
                             />
                         </div>
+                        <div className="flex justify-end space-x-4 pt-6">
+                            <button
+                                type="button"
+                                className="px-8 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl font-semibold transition-colors duration-200 flex items-center space-x-2"
+                                onClick={onClose}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                              type="submit"
+                              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl font-medium transition shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                              disabled={loading}
+                              form="add-drug-form"
+                          >
+                              {loading ? (
+                                  <>
+                                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                      Saving...
+                                  </>
+                              ) : (
+                                  <>
+                                      Save Drug
+                                  </>
+                              )}
+                          </button>
+                      </div>
+                        
                     </div>
                 </div>
                 </form>
@@ -306,7 +339,10 @@ function AddDrug({ onClose, onSuccess }) {
 
             <ImportExcelModal
                 open={showModal}
-                onClose={() => setShowModal(false)}
+                onClose={() => {
+                    showNavbar();
+                    setShowModal(false);
+                }}
                 type="drugs"
             />
         </div>

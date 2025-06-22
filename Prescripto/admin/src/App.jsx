@@ -3,6 +3,8 @@ import Login from './pages/Login'
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { AdminContext } from './context/AdminContext';
+import { DoctorContext } from './context/DoctorContext';
+import { useAppContext } from './context/AppContext';
 import Navbar from './components/Navbar';
 import Sidebar from './components/Sidebar';
 import { Route, Routes } from 'react-router-dom';
@@ -10,7 +12,6 @@ import DoctorsList from './pages/Admin/DoctorsList';
 import AddDoctor from './pages/Admin/AddDoctor';
 import Dashboard from './pages/Admin/Dashboard';
 import AllApoinments from './pages/Admin/AllApoinments';
-import { DoctorContext } from './context/DoctorContext';
 import DoctorDashboard from './pages/Doctor/DoctorDashboard';
 import DoctorAppoinments from './pages/Doctor/DoctorAppoinments';
 import DoctorProfile from './pages/Doctor/DoctorProfile';

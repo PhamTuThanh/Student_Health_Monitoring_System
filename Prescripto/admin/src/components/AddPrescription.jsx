@@ -1,109 +1,25 @@
-// import React, { useState } from 'react';
-// import { toast } from 'react-toastify';
-// import axios from 'axios';
-
-// const AddPrescription = ({ selectedAbnormality, onClose }) => {
-//     const [medicine, setMedicine] = useState("");
-//     const [dosage, setDosage] = useState("");
-//     const [instructions, setInstructions] = useState("");
-
-//     const handleSubmit = async (e) => {
-//         e.preventDefault();
-//         try {
-//             await axios.post("http://localhost:9000/api/doctor/prescription", {
-//                 abnormalityId: selectedAbnormality._id,
-//                 medicine,
-//                 dosage, //nghĩa là liều lượng
-//                 instructions,
-//             });
-//             toast.success("Lưu đơn thuốc thành công!");
-//             setMedicine("");
-//             setDosage("");
-//             setInstructions("");
-//             onClose();
-//         } catch (err) {
-//             toast.error("Lưu đơn thuốc thất bại!");
-//         }
-//     };
-
-//     return (
-//         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
-//             <div className="bg-white rounded-xl shadow-lg p-8 w-full max-w-md relative">
-//                 <button
-//                     className="absolute top-3 right-3 text-gray-400 hover:text-gray-700 text-2xl"
-//                     onClick={onClose}
-//                     title="Close"
-//                 >
-//                     &times;
-//                 </button>
-//                 <form onSubmit={handleSubmit}>
-//                     <div className="mb-4">
-//                         <label className="block font-semibold mb-1">Tên thuốc</label>
-//                         <input
-//                             type="text"
-//                             className="border rounded px-3 py-2 w-full"
-//                             value={medicine}
-//                             onChange={(e) => setMedicine(e.target.value)}
-//                             required
-//                         />
-//                     </div>
-//                     <div className="mb-4">
-//                         <label className="block font-semibold mb-1">Liều lượng</label>
-//                         <input
-//                             type="text"
-//                             className="border rounded px-3 py-2 w-full"
-//                             value={dosage}
-//                             onChange={(e) => setDosage(e.target.value)}
-//                             required
-//                         />
-//                     </div>
-//                     <div className="mb-4">
-//                         <label className="block font-semibold mb-1">Hướng dẫn dùng</label>
-//                         <textarea
-//                             className="border rounded px-3 py-2 w-full"
-//                             rows={3} 
-//                             value={instructions}
-//                             onChange={(e) => setInstructions(e.target.value)}
-//                             required
-//                         />
-//                     </div>
-//                     <div className="flex gap-3 justify-end">
-//                         <button
-//                             type="submit"
-//                             className="bg-green-600 hover:bg-green-700 text-white px-5 py-2 rounded font-semibold"
-//                         >
-//                             Lưu đơn thuốc
-//                         </button>
-//                         <button
-//                             type="button"
-//                             className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-5 py-2 rounded font-semibold"
-//                             onClick={onClose}
-//                         >
-//                             Hủy
-//                         </button>
-//                     </div>
-//                 </form>
-//             </div>
-//         </div>
-//     );
-// };
-
-// export default AddPrescription;
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Pill, Clock, FileText, Calendar, User, AlertCircle, Plus, Trash2 } from 'lucide-react';
+import axios from 'axios';
+import { useNavbarControl } from '../hooks/useNavbarControl';
 
 const AddPrescription = ({ selectedAbnormality, onClose }) => {
+    const { hideNavbar, showNavbar } = useNavbarControl(false);
+    
     // Main prescription info
     const [doctorName, setDoctorName] = useState("");
     const [prescriptionDate, setPrescriptionDate] = useState(new Date().toISOString().split('T')[0]);
     const [diagnosis, setDiagnosis] = useState("");
     const [notes, setNotes] = useState("");
     
+    // Drug stock state
+    const [drugStock, setDrugStock] = useState([]);
+
     // Medicine list
     const [medicines, setMedicines] = useState([
         {
             id: 1,
-            name: "",
+            drugId: "",
             dosage: "",
             frequency: "",
             duration: "",
@@ -112,11 +28,30 @@ const AddPrescription = ({ selectedAbnormality, onClose }) => {
         }
     ]);
 
+    useEffect(() => {
+        const fetchDrugStock = async () => {
+            try {
+                const response = await axios.get('http://localhost:9000/api/doctor/get-drug-stock');
+                if (response.data.success) {
+                    setDrugStock(response.data.data);
+                }
+            } catch (error) {
+                console.error("Error fetching drug stock:", error);
+            }
+        };
+        fetchDrugStock();
+    }, []);
+
+    const handleClose = () => {
+        showNavbar();
+        onClose();
+    };
+
     const addMedicine = () => {
-        const newId = Math.max(...medicines.map(m => m.id)) + 1;
+        const newId = medicines.length > 0 ? Math.max(...medicines.map(m => m.id)) + 1 : 1;
         setMedicines([...medicines, {
             id: newId,
-            name: "",
+            drugId: "",
             dosage: "",
             frequency: "",
             duration: "",
@@ -131,6 +66,12 @@ const AddPrescription = ({ selectedAbnormality, onClose }) => {
         }
     };
 
+    const handleMedicineChange = (id, selectedDrugId) => {
+        setMedicines(medicines.map(m =>
+            m.id === id ? { ...m, drugId: selectedDrugId } : m
+        ));
+    };
+
     const updateMedicine = (id, field, value) => {
         setMedicines(medicines.map(m => 
             m.id === id ? { ...m, [field]: value } : m
@@ -140,23 +81,42 @@ const AddPrescription = ({ selectedAbnormality, onClose }) => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         
-        // Mock API call
         const prescriptionData = {
             abnormalityId: selectedAbnormality._id,
+            studentId: selectedAbnormality.studentId,
             doctorName,
             prescriptionDate,
             diagnosis,
-            medicines: medicines.filter(m => m.name.trim() !== ""),
+            medicines: medicines.map(m => ({
+                drugId: m.drugId,
+                dosage: m.dosage,
+                frequency: m.frequency,
+                duration: m.duration,
+                instructions: m.instructions,
+                beforeAfterMeal: m.beforeAfterMeal
+            })).filter(m => m.drugId),
             notes
         };
-        
-        console.log("Prescription data:", prescriptionData);
-        
-        // Mock success
-        setTimeout(() => {
-            alert("Prescription saved successfully!");
-            onClose();
-        }, 500);
+
+        if (prescriptionData.medicines.length === 0) {
+            alert("Please add at least one medicine.");
+            return;
+        }
+
+        try {
+            // Note: A new backend endpoint is required to handle this submission.
+            const response = await axios.post("http://localhost:9000/api/doctor/add-prescription", prescriptionData);
+            if (response.data.success) {
+                alert("Prescription saved successfully!");
+                showNavbar();
+                onClose();
+            } else {
+                alert(`Error: ${response.data.message}`);
+            }
+        } catch (error) {
+            console.error("Error saving prescription:", error);
+            alert("Failed to save prescription. Check the console for more details.");
+        }
     };
 
     const frequencyOptions = [
@@ -177,7 +137,7 @@ const AddPrescription = ({ selectedAbnormality, onClose }) => {
     ];
 
     return (
-        <div className="fixed inset-0 z-100 flex items-center justify-center bg-black bg-opacity-50 p-4">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black bg-opacity-50 p-4">
             <div className="bg-white rounded-3xl shadow-2xl w-full max-w-5xl max-h-[95vh] overflow-hidden">
                 {/* Header */}
                 <div className="bg-gradient-to-r from-green-600 to-emerald-600 px-6 py-4 text-white">
@@ -194,7 +154,7 @@ const AddPrescription = ({ selectedAbnormality, onClose }) => {
                             </div>
                         </div>
                         <button
-                            onClick={onClose}
+                            onClick={handleClose}
                             className="text-white hover:text-green-200 transition-colors p-2 hover:bg-white hover:bg-opacity-20 rounded-full"
                         >
                             <X className="w-6 h-6" />
@@ -292,14 +252,19 @@ const AddPrescription = ({ selectedAbnormality, onClose }) => {
                                                 <label className="block text-sm font-medium text-gray-700 mb-2">
                                                     Medicine Name *
                                                 </label>
-                                                <input
-                                                    type="text"
+                                                <select
                                                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-                                                    value={medicine.name}
-                                                    onChange={(e) => updateMedicine(medicine.id, 'name', e.target.value)}
-                                                    placeholder="e.g., Paracetamol 500mg"
+                                                    value={medicine.drugId}
+                                                    onChange={(e) => handleMedicineChange(medicine.id, e.target.value)}
                                                     required
-                                                />
+                                                >
+                                                    <option value="">Select medicine</option>
+                                                    {drugStock.map(drug => (
+                                                        <option key={drug._id} value={drug._id}>
+                                                            {`${drug.drugName} (${drug.drugCode}) - Stock: ${drug.inventoryQuantity}`}
+                                                        </option>
+                                                    ))}
+                                                </select>
                                             </div>
 
                                             <div>
@@ -406,7 +371,7 @@ const AddPrescription = ({ selectedAbnormality, onClose }) => {
                         <div className="flex justify-end space-x-4 pt-6 border-t border-gray-200">
                             <button
                                 type="button"
-                                onClick={onClose}
+                                onClick={handleClose}
                                 className="px-8 py-3 text-gray-700 bg-gray-200 hover:bg-gray-300 rounded-xl font-semibold transition-colors duration-200"
                             >
                                 Cancel

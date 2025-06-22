@@ -13,6 +13,7 @@ const loginUser = async (values) => {
     if (token) {
         await AsyncStorage.setItem("token", token);
     }
+    console.log("response", response.data);
     return response.data;
 }
 
@@ -22,6 +23,20 @@ const registerUser = async (values) => {
      {headers: { "Content-Type": "application/json" }}
     )
     return response.data
+}
+const forgotPassword = async (email) => {
+    const response = await axios.post(`${BACKEND_URL}/api/user/forgot-password`, {email})
+    return response.data
+}
+const changePassword = async (passwordData) => {
+    const token = await AsyncStorage.getItem("token");
+    if (!token) {
+        throw new Error("No authentication token found");
+    }
+    const response = await axios.post(`${BACKEND_URL}/api/user/change-password`, passwordData, {
+        headers: { "Authorization": `Bearer ${token}` }
+    });
+    return response.data;
 }
 const getChatbot = async (message) => {
     const response = await axios.post(`${BACKEND_URL_CHATBOT}/api/chat`, {message})
@@ -187,4 +202,4 @@ const getAbnormalData = async (studentId) => {
     });
     return response.data;
 };
-export {loginUser, registerUser, getChatbot, getDataPhysical, messageSidebar, getMessage, sendMessage, saveChatHistory, getChatHistory, getAnnouncements, getInfoUser, getPhysicalData, getAbnormalData};
+export {loginUser, registerUser, getChatbot, getDataPhysical, messageSidebar, getMessage, sendMessage, saveChatHistory, getChatHistory, getAnnouncements, getInfoUser, getPhysicalData, getAbnormalData, forgotPassword, changePassword};

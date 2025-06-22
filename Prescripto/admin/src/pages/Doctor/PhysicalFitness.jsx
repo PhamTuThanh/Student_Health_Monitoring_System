@@ -4,6 +4,8 @@ import { toast } from "react-toastify";
 import { DoctorContext } from "../../context/DoctorContext";
 import * as XLSX from 'xlsx';
 import { saveAs } from "file-saver";
+import ImportExcelModal from "../../components/ImportExcelModal";
+
 
 // Utility functions for calculations
 const calculateZScoreCC = (height) => {
@@ -41,10 +43,10 @@ const getDanhGiaBMI = (bmi) => {
   if (!bmi) return "";
   const bmiValue = parseFloat(bmi);
   if (bmiValue < 18.5) return "G";
-  if (bmiValue < 22.9) return "BT";
-  if (bmiValue < 24.9) return "TC";
-  if (bmiValue < 29.9) return "BP I";
-  if (bmiValue < 30) return "BP II";
+  if (bmiValue < 22.9 && bmiValue > 18.5) return "BT";
+  if (bmiValue < 24.9 && bmiValue > 22.9) return "TC";
+  if (bmiValue < 29.9 && bmiValue > 24.9) return "BP I";
+  if (bmiValue < 30 && bmiValue > 29.9) return "BP II";
   return "BP III";
 };
 const getDanhGiaTTH = (systolic, diastolic) => {
@@ -60,6 +62,7 @@ const getDanhGiaHeartRate = (heartRate) => {
   if (heartRateValue > 100) return "NTC";
   return "NTBT";
 };
+
 
 const exportToExcel = (data, filename) => {
   const workbook = XLSX.utils.book_new();
@@ -84,8 +87,10 @@ export default function PhysicalFitness() {
   const [currentPage, setCurrentPage] = useState(1);
   const rowsPerPage = 10;
   const [examSessionId, setExamSessionId] = useState("");
+  const [autoSelected, setAutoSelected] = useState(false);
   const backendUrl = import.meta.env.VITE_BACKEND_URL;
-  const { dToken } = useContext(DoctorContext);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
   const getAcademicYears = (range = 2) => {
     const currentYear = new Date().getFullYear();
     const years = [];
@@ -105,9 +110,7 @@ export default function PhysicalFitness() {
         setError(null);
         const [studentsRes, fitnessRes] = await Promise.all([
           axios.get(`${backendUrl}/api/students`),
-          axios.get(`${backendUrl}/api/doctor/physical-fitness-by-session?examSessionId=${examSessionId}`, {
-            headers: { dToken }
-          }),
+          axios.get(`${backendUrl}/api/doctor/physical-fitness-by-session?examSessionId=${examSessionId}`),
         ]);
         if (studentsRes.data.success) {
           const fitnessData = Array.isArray(fitnessRes.data.data) ? fitnessRes.data.data : [];
@@ -123,9 +126,9 @@ export default function PhysicalFitness() {
             });
             return {
               ...s,
-              dob: s.dob && !isNaN(s.dob) ? excelSerialDateToISO(s.dob) : s.dob || "",
+              dob: formatDate(s.dob),
               gender: s.gender || "",
-              followDate: fit?.followDate && !isNaN(fit.followDate) ? excelSerialDateToISO(fit.followDate) : fit?.followDate || "",
+              followDate: formatDate(fit?.followDate),
               height: fit?.height || "",
               weight: fit?.weight || "",
               zScoreCC: fit?.zScoreCC || "",
@@ -158,6 +161,12 @@ export default function PhysicalFitness() {
     }
   }, [examSessionId]);
 
+  // Reset page to 1 only when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedYear, selectedClass, searchId]);
+
+  // Apply filters when rows or filter criteria change
   useEffect(() => {
     let filtered = [...rows];
     if (selectedYear) {
@@ -174,9 +183,20 @@ export default function PhysicalFitness() {
       });
     }
     setFilteredRows(filtered);
-    setCurrentPage(1);
-  }, [selectedYear, selectedClass, searchId, rows]);
+  }, [rows, selectedYear, selectedClass, searchId]);
 
+  const exportColumns = [
+    "studentId", "name", "gender", "cohort", "dob", "followDate",
+    "height", "weight", "systolic", "diastolic", "heartRate"
+  ];
+  const exportData = filteredRows.map((row) => {
+       const obj = {}
+       exportColumns.forEach(col => {
+          obj[col] = row[col]
+       })
+       return obj
+    });
+    
   function excelSerialDateToISO(serial) {
     if (!serial || isNaN(serial)) return "";
     const utc_days = Math.floor(serial - 25569);
@@ -185,53 +205,78 @@ export default function PhysicalFitness() {
     return date_info.toISOString().slice(0, 10);
   }
 
-  const handleChange = (idx, field, value) => {
-    const newRows = [...rows];
-    newRows[idx][field] = value;
-    const height = parseFloat(newRows[idx].height) || 0;
-    const weight = parseFloat(newRows[idx].weight) || 0;
-    newRows[idx].zScoreCC = calculateZScoreCC(height);
-    newRows[idx].danhGiaCC = getDanhGiaCC(newRows[idx].zScoreCC);
-    newRows[idx].zScoreCN = calculateZScoreCN(weight);
-    newRows[idx].danhGiaCN = getDanhGiaCN(newRows[idx].zScoreCN);
-    newRows[idx].bmi = calculateBMI(weight, height);
-    newRows[idx].danhGiaBMI = getDanhGiaBMI(newRows[idx].bmi);
-    newRows[idx].danhGiaTTH = getDanhGiaTTH(newRows[idx].systolic, newRows[idx].diastolic);
-    newRows[idx].danhGiaHeartRate = getDanhGiaHeartRate(newRows[idx].heartRate);
-    newRows[idx].zScoreCNCc =
-      newRows[idx].zScoreCN && newRows[idx].zScoreCC
-        ? (parseFloat(newRows[idx].zScoreCN) - parseFloat(newRows[idx].zScoreCC)).toFixed(2)
-        : "";
+  const formatDate = (value) => {
+    if (!value) return "";
+    const sValue = String(value);
+    // Excel dates are numbers and don't contain typical date string characters.
+    if (!isNaN(value) && !sValue.includes('-') && !sValue.includes('/') && sValue.trim() !== '') {
+      return excelSerialDateToISO(value);
+    }
+    const date = new Date(value);
+    if (!isNaN(date.getTime())) {
+      return date.toISOString().slice(0, 10);
+    }
+    return "";
+  };
+
+  const handleChange = (rowId, field, value) => {
+    const newRows = rows.map(row => {
+      if (row._id === rowId) {
+        const updatedRow = { ...row, [field]: value };
+        const height = parseFloat(updatedRow.height) || 0;
+        const weight = parseFloat(updatedRow.weight) || 0;
+        updatedRow.zScoreCC = calculateZScoreCC(height);
+        updatedRow.danhGiaCC = getDanhGiaCC(updatedRow.zScoreCC);
+        updatedRow.zScoreCN = calculateZScoreCN(weight);
+        updatedRow.danhGiaCN = getDanhGiaCN(updatedRow.zScoreCN);
+        updatedRow.bmi = calculateBMI(weight, height);
+        updatedRow.danhGiaBMI = getDanhGiaBMI(updatedRow.bmi);
+        updatedRow.danhGiaTTH = getDanhGiaTTH(updatedRow.systolic, updatedRow.diastolic);
+        updatedRow.danhGiaHeartRate = getDanhGiaHeartRate(updatedRow.heartRate);
+        updatedRow.zScoreCNCc =
+          updatedRow.zScoreCN && updatedRow.zScoreCC
+            ? (parseFloat(updatedRow.zScoreCN) - parseFloat(updatedRow.zScoreCC)).toFixed(2)
+            : "";
+        return updatedRow;
+      }
+      return row;
+    });
     setRows(newRows);
   };
 
-  const handleSave = async (idx) => {
+  const handleSave = async (rowId) => {
     try {
-      const row = rows[idx];
+      const rowToSave = rows.find(r => r._id === rowId);
+      if (!rowToSave) {
+        toast.error("Could not find row to save.");
+        return;
+      }
+      const stt = filteredRows.findIndex(r => r._id === rowId) + 1;
       const response = await axios.post(`${backendUrl}/api/doctor/physical-fitness`, {
-        stt: indexOfFirstRow + idx + 1,
-        studentId: row.studentId,
+        stt,
+        studentId: rowToSave.studentId,
         examSessionId: examSessionId,
-        gender: row.gender,
-        followDate: row.followDate,
-        height: row.height,
-        weight: row.weight,
-        zScoreCC: row.zScoreCC,
-        danhGiaCC: row.danhGiaCC,
-        zScoreCN: row.zScoreCN,
-        danhGiaCN: row.danhGiaCN,
-        zScoreCNCc: row.zScoreCNCc,
-        bmi: row.bmi,
-        danhGiaBMI: row.danhGiaBMI,
-        systolic: row.systolic,
-        diastolic: row.diastolic,
-        danhGiaTTH: row.danhGiaTTH,
-        heartRate: row.heartRate,
-        danhGiaHeartRate: row.danhGiaHeartRate,
+        cohort: rowToSave.cohort,
+        gender: rowToSave.gender,
+        followDate: rowToSave.followDate,
+        height: rowToSave.height,
+        weight: rowToSave.weight,
+        zScoreCC: rowToSave.zScoreCC,
+        danhGiaCC: rowToSave.danhGiaCC,
+        zScoreCN: rowToSave.zScoreCN,
+        danhGiaCN: rowToSave.danhGiaCN,
+        zScoreCNCc: rowToSave.zScoreCNCc,
+        bmi: rowToSave.bmi,
+        danhGiaBMI: rowToSave.danhGiaBMI,
+        systolic: rowToSave.systolic,
+        diastolic: rowToSave.diastolic,
+        danhGiaTTH: rowToSave.danhGiaTTH,
+        heartRate: rowToSave.heartRate,
+        danhGiaHeartRate: rowToSave.danhGiaHeartRate,
       });
-      alert(response.data.message);
+      toast.success(response.data.message);
     } catch (err) {
-      alert("Error saving data: " + (err.response?.data?.message || err.message));
+      toast.error("Error saving data: " + (err.response?.data?.message || err.message));
     }
   };
 
@@ -255,8 +300,7 @@ export default function PhysicalFitness() {
         formData,
         {
           headers: {
-            'Content-Type': 'multipart/form-data',
-            dToken
+            'Content-Type': 'multipart/form-data'
           }
         }
       );
@@ -295,9 +339,7 @@ export default function PhysicalFitness() {
     try {
       const [studentsRes, fitnessRes] = await Promise.all([
         axios.get(`${backendUrl}/api/students`),
-        axios.get(`${backendUrl}/api/doctor/physical-fitness-by-session?examSessionId=${examSessionId}`, {
-          headers: { dToken }
-        })
+        axios.get(`${backendUrl}/api/doctor/physical-fitness-by-session?examSessionId=${examSessionId}`),
       ]);
       if (studentsRes.data.success) {
         const fitnessData = Array.isArray(fitnessRes.data.data) ? fitnessRes.data.data : [];
@@ -313,9 +355,9 @@ export default function PhysicalFitness() {
           });
           return {
             ...s,
-            dob: s.dob && !isNaN(s.dob) ? excelSerialDateToISO(s.dob) : s.dob || "",
+            dob: formatDate(s.dob),
             gender: s.gender || "",
-            followDate: fit?.followDate && !isNaN(fit.followDate) ? excelSerialDateToISO(fit.followDate) : fit?.followDate || "",
+            followDate: formatDate(fit?.followDate),
             height: fit?.height || "",
             weight: fit?.weight || "",
             zScoreCC: fit?.zScoreCC || "",
@@ -355,7 +397,23 @@ export default function PhysicalFitness() {
     const fetchExamSessions = async () => {
       try {
         const res = await axios.get(`${backendUrl}/api/doctor/list-exam-sessions`);
-        if (res.data.success) setExamSessions(res.data.data);
+        if (res.data.success) {
+          setExamSessions(res.data.data);
+          if (!examSessionId && res.data.data.length > 0 && !autoSelected) {
+            const sorted = [...res.data.data].sort((a, b) => {
+              const getYear = (s) => {
+                if (s.examSessionAcademicYear) {
+                  const y = parseInt(String(s.examSessionAcademicYear).split('-')[0]);
+                  return isNaN(y) ? 0 : y;
+                }
+                return s.createdAt ? new Date(s.createdAt).getFullYear() : 0;
+              };
+              return getYear(b) - getYear(a);
+            });
+            setExamSessionId(sorted[0]._id);
+            setAutoSelected(true);
+          }
+        }
       } catch (err) {
         toast.error(err.response?.data?.message || err.message);
       }
@@ -364,14 +422,32 @@ export default function PhysicalFitness() {
   }, []);
 
   if (loading) {
-    return <div className="flex justify-center items-center h-screen">Loading...</div>;
+    return (
+      <div className="fixed inset-0 z-50 flex flex-col justify-center items-center bg-white bg-opacity-70">
+        <div className="w-16 h-16 border-4 border-blue-400 border-t-transparent rounded-full animate-spin mb-4"></div>
+        <div className="text-lg text-blue-600 font-semibold animate-pulse">Đang tải dữ liệu...</div>
+      </div>
+    );
   }
   if (error) {
     return <div className="text-red-500 text-center p-4">Error: {error}</div>;
   }
 
+
   return (
     <div className='w-full max-w-6xl m-5'>
+      <ImportExcelModal
+        open={isModalOpen}
+        onClose={(shouldRefresh) => {
+            setIsModalOpen(false);
+            if (shouldRefresh) {
+                refreshData();
+            }
+        }}
+        type="physical-fitness"
+        examSessionId={examSessionId}
+        templateUrl={"/example_phys_randomized.xlsx"}
+      />
       <div className="scale-[0.75] origin-top-left w-[133.33%] px-8">
         <div className="mb-6 flex flex-wrap gap-6 items-center justify-center bg-[#f8fafc] rounded-xl py-4 px-8 shadow-sm border border-[#e5e7eb]">
           <div className="flex items-center gap-2">
@@ -381,10 +457,10 @@ export default function PhysicalFitness() {
               onChange={(e) => setExamSessionId(e.target.value)}
               className="border rounded px-3 py-1.5 min-w-[120px]"
             >
-              <option value="">Select Exam Session</option>
-              {examSessions.map(session => (
-                <option key={session._id} value={session._id}>{session.examSessionAcademicYear} </option>
-              ))}
+                {examSessions.length === 0 && <option value="">Không có kỳ thi</option>}
+                {examSessions.length > 0 && examSessions.map(session => (
+                  <option key={session._id} value={session._id}>{session.examSessionAcademicYear} </option>
+                ))}
             </select>
           </div>
           <div className="flex items-center gap-2">
@@ -419,21 +495,15 @@ export default function PhysicalFitness() {
             />
           </div>
           <div className="flex items-center gap-2">
-            <input
-              type="file"
-              accept=".xlsx,.xls"
-              ref={fileInputRef}
-              className="border rounded px-3 py-1.5"
-            />
             <button
-              onClick={handleImportExcel}
+              onClick={() => setIsModalOpen(true)}
               className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-1.5 rounded"
-              disabled={loading}
+              disabled={loading || !examSessionId}
             >
               Import Excel
             </button>
             <button
-              onClick={() => exportToExcel(filteredRows, `physical_fitness_${examSessionId}.xlsx`)}
+              onClick={() => exportToExcel(exportData,  `physical_fitness_${examSessionId}.xlsx`)}
               className="bg-green-500 hover:bg-green-600 text-white px-4 py-1.5 rounded"
               disabled={!examSessionId}
             >
@@ -484,7 +554,7 @@ export default function PhysicalFitness() {
                         type="date"
                         className="w-[120px] border rounded px-2 py-1"
                         value={row.followDate}
-                        onChange={(e) => handleChange(idx, "followDate", e.target.value)}
+                        onChange={(e) => handleChange(row._id, "followDate", e.target.value)}
                       />
                     </td>
                     <td className="text-center align-middle py-2 border-r border-[#eee]">
@@ -492,7 +562,7 @@ export default function PhysicalFitness() {
                         type="number"
                         className="w-[80px] border rounded px-2 py-1"
                         value={row.height}
-                        onChange={(e) => handleChange(idx, "height", e.target.value)}
+                        onChange={(e) => handleChange(row._id, "height", e.target.value)}
                       />
                     </td>
                     <td className="text-center align-middle py-2 border-r border-[#eee]">{row.zScoreCC}</td>
@@ -502,7 +572,7 @@ export default function PhysicalFitness() {
                         type="number"
                         className="w-[80px] border rounded px-2 py-1"
                         value={row.weight}
-                        onChange={(e) => handleChange(idx, "weight", e.target.value)}
+                        onChange={(e) => handleChange(row._id, "weight", e.target.value)}
                       />
                     </td>
                     <td className="text-center align-middle py-2 border-r border-[#eee]">{row.zScoreCN}</td>
@@ -515,7 +585,7 @@ export default function PhysicalFitness() {
                         type="number"
                         className="w-[70px] border rounded px-2 py-1"
                         value={row.systolic}
-                        onChange={(e) => handleChange(idx, "systolic", e.target.value)}
+                        onChange={(e) => handleChange(row._id, "systolic", e.target.value)}
                       />
                     </td>
                     <td className="text-center align-middle py-2 border-r border-[#eee]">
@@ -523,7 +593,7 @@ export default function PhysicalFitness() {
                         type="number"
                         className="w-[70px] border rounded px-2 py-1"
                         value={row.diastolic}
-                        onChange={(e) => handleChange(idx, "diastolic", e.target.value)}
+                        onChange={(e) => handleChange(row._id, "diastolic", e.target.value)}
                       />
                     </td>
                     <td className="text-center align-middle py-2 border-r border-[#eee]">{row.danhGiaTTH}</td>
@@ -532,14 +602,14 @@ export default function PhysicalFitness() {
                         type="number"
                         className="w-[70px] border rounded px-2 py-1"
                         value={row.heartRate}
-                        onChange={(e) => handleChange(idx, "heartRate", e.target.value)}
+                        onChange={(e) => handleChange(row._id, "heartRate", e.target.value)}
                       />
                     </td>
                     <td className="text-center align-middle py-2 border-r border-[#eee]">{row.danhGiaHeartRate}</td>
                     <td className="text-center align-middle py-2">
                       <button
                         className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded"
-                        onClick={() => handleSave(idx)}
+                        onClick={() => handleSave(row._id)}
                       >
                         Save
                       </button>
@@ -573,9 +643,10 @@ export default function PhysicalFitness() {
             >
               Next
             </button>
-          </div>
+          </div>  
         </div>
       </div>
+   
     </div>
   );
 }

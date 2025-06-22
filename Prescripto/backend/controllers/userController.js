@@ -8,9 +8,10 @@ import doctorModel from './../models/doctorModel.js';
 import appoinmentModel from '../models/appoinmentModel.js';
 import physicalFitnessModel from '../models/physicalFitnessModel.js';
 import paypal from 'paypal-rest-sdk';
-import { sendAppointmentNotification } from '../utils/emailService.js';
+import { sendAppointmentNotification, sendForgotPasswordEmail } from '../utils/emailService.js';
 import chatBotModel from '../models/chatBotModel.js';
 import News from '../models/newsModel.js';
+import nodemailer from 'nodemailer';    
 
 const registerUser = async (req, res) => {
     const { name, password, email } = req.body;
@@ -55,14 +56,14 @@ const registerUser = async (req, res) => {
 };
 
 const loginUser = async (req, res) => {
-    const { email, password, role } = req.body; // Role can be 'student' or 'user' (or implicitly 'doctor' handled by doctorLogin)
+    const { email, password, role } = req.body;
     try {
         let userData;
         if (role === 'student') {
             userData = await userModel.findOne({ email, role: 'student' });
-        } else if (role === 'user') { // General user login
+        } else if (role === 'user') {
             userData = await userModel.findOne({ email, role: 'user' });
-        } else { // Default to general user if role is not specified or is something else unexpected for this controller
+        } else {
             userData = await userModel.findOne({ email });
         }
 
@@ -76,6 +77,16 @@ const loginUser = async (req, res) => {
         }
 
         const token = jwt.sign({ id: userData._id, role: userData.role }, process.env.JWT_SECRET, { expiresIn: '1d' });
+
+        // Set httpOnly cookie cho web
+        res.cookie('token', token, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            maxAge: 24 * 60 * 60 * 1000
+        });
+
+        // Trả về token cho mobile
         res.json({ 
           success: true, 
           token, 
@@ -100,6 +111,97 @@ const loginUser = async (req, res) => {
     } catch (error) {
         console.log(error);
         res.json({ success: false, message: "Error logging in" });
+    }
+};
+const forgotPassword = async (req, res) => {
+    const {email} = req.body;
+    try {
+        console.log('🔍 Forgot password request for email:', email);
+        
+        const user = await userModel.findOne({email});
+        if (!user) {
+            console.log('❌ User not found for email:', email);
+            return res.json({success:false, message: 'User not found'})
+        }
+        
+        console.log('✅ User found:', user.name);
+        
+        // Tạo mật khẩu ngẫu nhiên (8 ký tự, bao gồm chữ hoa, chữ thường, số)
+        const generateRandomPassword = () => {
+            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+            let password = '';
+            for (let i = 0; i < 8; i++) {
+                password += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            return password;
+        };
+        
+        const newPassword = generateRandomPassword();
+        console.log('🔑 Generated new password:', newPassword);
+        
+        // Hash mật khẩu mới
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(newPassword, salt);
+        
+        // Cập nhật mật khẩu trong database
+        await userModel.findByIdAndUpdate(user._id, { password: hashedPassword });
+        console.log('✅ Password updated in database');
+        
+        // Gửi email với mật khẩu mới
+        console.log('📧 Sending new password email to:', user.email);
+        const emailResult = await sendForgotPasswordEmail(user.email, newPassword);
+        console.log('📧 Email result:', emailResult);
+        
+        if (!emailResult.success) {
+            console.log('❌ Email sending failed:', emailResult.error);
+            return res.json({success:false, message: 'Failed to send new password email'})
+        }
+        
+        console.log('✅ Forgot password process completed successfully');
+        res.json({success:true, message: 'New password sent to your email'})
+    } catch (error) {
+        console.log('❌ Error in forgotPassword:', error);
+        res.json({success:false, message: error.message})
+    }
+}
+
+const changePassword = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { oldPassword, newPassword, confirmPassword } = req.body;
+
+        if (!oldPassword || !newPassword || !confirmPassword) {
+            return res.status(400).json({ success: false, message: "Please provide all required fields." });
+        }
+
+        if (newPassword !== confirmPassword) {
+            return res.status(400).json({ success: false, message: "New password and confirm password do not match." });
+        }
+        
+        if (newPassword.length < 8) {
+            return res.status(400).json({ success: false, message: "Password must be at least 8 characters long." });
+        }
+
+        const user = await userModel.findById(userId);
+        if (!user) {
+            return res.status(404).json({ success: false, message: "User not found." });
+        }
+
+        const isMatch = await bcrypt.compare(oldPassword, user.password);
+        if (!isMatch) {
+            return res.status(400).json({ success: false, message: "Incorrect old password." });
+        }
+
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+        await userModel.findByIdAndUpdate(userId, { password: hashedPassword });
+
+        res.json({ success: true, message: "Password changed successfully." });
+
+    } catch (error) {
+        console.error("Error in changePassword:", error);
+        res.status(500).json({ success: false, message: "Server error while changing password." });
     }
 };
 
@@ -503,5 +605,4 @@ const getAnnouncements = async (req, res) => {
     }
 }
 
-
-export { registerUser, loginUser, getProfile, updateProfile, bookAppoinment, listAppoinment, cancelAppoinment, createPayPalPayment,handlePayPalSuccess,handlePayPalCancel, sendEmail, getUsersForChat, getDoctorsForChat, getPhysicalData, saveChatHistory, getChatHistory, getAnnouncements };
+export { registerUser, loginUser, getProfile, updateProfile, bookAppoinment, listAppoinment, cancelAppoinment, createPayPalPayment,handlePayPalSuccess,handlePayPalCancel, sendEmail, getUsersForChat, getDoctorsForChat, getPhysicalData, saveChatHistory, getChatHistory, getAnnouncements, forgotPassword, changePassword };

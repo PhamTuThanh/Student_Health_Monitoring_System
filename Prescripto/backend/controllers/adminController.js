@@ -134,7 +134,20 @@ const addStudent = async (req, res) => {
             // Consider storing admin credentials more securely if this is for a real application
             if(email === process.env.ADMIN_EMAIL && password === process.env.ADMIN_PASSWORD){
                 const token = jwt.sign({email: email, role: 'admin'}, process.env.JWT_SECRET, { expiresIn: '1d' });
-                res.json({success:true, token});
+                
+                res.cookie('aToken', token, {
+                    httpOnly: true,
+                    secure: process.env.NODE_ENV === 'production',
+                    sameSite: 'strict',
+                    maxAge: 24 * 60 * 60 * 1000 // 1 day
+                });
+
+                res.status(200).json({
+                    success: true,
+                    message: 'Admin logged in successfully',
+                    token: token
+                });
+
             } else {
                 res.json({success:false, message: "Please try login again"});
             }
@@ -144,6 +157,20 @@ const addStudent = async (req, res) => {
             res.json({success:false, message:error.message});
         }
     }
+//API for admin logout
+const logoutAdmin = async (req, res) => {
+    try {
+        res.clearCookie('aToken', {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'strict',
+        });
+        res.status(200).json({ success: true, message: "Logged out successfully" });
+    } catch (error) {
+        console.log(error);
+        res.status(500).json({ success: false, message: "Logout failed" });
+    }
+}
 //API to get all doctor list for admin panel
     const allDoctors = async(req, res) => {
         try{
@@ -412,4 +439,4 @@ const createExamSession = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
-export { addDoctor, loginAdmin, allDoctors, appoinmentsAdmin, appoinmentCancel, adminDashboard, deleteDoctor, addStudent, listStudents, importStudentsExcel, addNews, getNews, updateNews, deleteNews, createExamSession };
+export { addDoctor, loginAdmin, logoutAdmin, allDoctors, appoinmentsAdmin, appoinmentCancel, adminDashboard, deleteDoctor, addStudent, listStudents, importStudentsExcel, addNews, getNews, updateNews, deleteNews, createExamSession };

@@ -6,6 +6,7 @@ const PhysicalFitnessSchema = new mongoose.Schema({
     ref: "ExamSession"
   },
   studentId: String,
+  cohort: String,
   gender: String,
   followDate: String,
   height: Number,

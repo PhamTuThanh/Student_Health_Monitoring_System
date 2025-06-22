@@ -2,40 +2,72 @@ import React, { useEffect, useState } from 'react';
 import { Users, Activity, UserCheck, TrendingUp } from 'lucide-react';
 import axios from 'axios';
 
+
 const DataAnalysis = () => {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [examSessionId, setExamSessionId] = useState("");
+  const [autoSelected, setAutoSelected] = useState(false);
+  const [examSessions, setExamSessions] = useState([]);
+  const [selectedClass, setSelectedClass] = useState("");
+  const [classes, setClasses] = useState([]);
+  const backendUrl = import.meta.env.VITE_BACKEND_URL;
 
   useEffect(() => {
-    // Simulate API call with mock data
-    // setTimeout(() => {
-    //   const mockStats = {
-    //     total: 1250,
-    //     daTDSK: 1100,
-    //     male: 680,
-    //     female: 570,
-    //     bmiStats: {
-    //       'Underweight': 125,
-    //       'Normal': 750,
-    //       'Overweight': 275,
-    //       'Obese': 100
-    //     }
-    //   };
-    //   setStats(mockStats);
-    //   setLoading(false);
-    // }, 1000);
-    
-    axios.get('http://localhost:9000/api/doctor/physical-fitness-status')
+    axios.get(`${backendUrl}/api/doctor/list-exam-sessions`)
       .then(res => {
-        console.log('API response:', res.data);
+        setExamSessions(res.data.data);
+        if (!examSessionId && res.data.data.length > 0 && !autoSelected) {
+          const sorted = [...res.data.data].sort((a, b) => {
+            const getYear = (s) => {
+              if (s.examSessionAcademicYear) {
+                const y = parseInt(String(s.examSessionAcademicYear).split('-')[0]);
+                return isNaN(y) ? 0 : y;
+              }
+              return s.createdAt ? new Date(s.createdAt).getFullYear() : 0;
+            };
+            return getYear(b) - getYear(a);
+          });
+          setExamSessionId(sorted[0]._id);
+          setAutoSelected(true);
+        }
+      })
+      .catch(err => console.error(err));
+  }, []);
+  
+  useEffect(() => {
+    if (!examSessionId) {
+      setClasses([]);
+      setSelectedClass("");
+      return;
+    }
+    axios.get(`${backendUrl}/api/doctor/physical-fitness-by-session?examSessionId=${examSessionId}`)
+      .then(res => {
+        const data = res.data.data || [];
+        const uniqueClasses = [...new Set(data.map(row => row.cohort))].filter(Boolean);
+        setClasses(uniqueClasses);
+        setSelectedClass("");
+      })
+      .catch(() => setClasses([]));
+  }, [examSessionId]);
+
+  useEffect(() => {
+    if (!examSessionId) return;
+    setLoading(true);
+    let url = `${backendUrl}/api/doctor/physical-fitness-status?examSessionId=${examSessionId}`;
+    if (selectedClass && selectedClass !== "") {
+      url += `&cohort=${encodeURIComponent(selectedClass)}`;
+    }
+    axios.get(url)
+      .then(res => {
         setStats(res.data);
         setLoading(false);
       })
       .catch(err => {
-        console.error('API error:', err);
         setLoading(false);
+        setStats(null);
       });
-  }, []);
+  }, [examSessionId, selectedClass]);
 
   // Prepare chart data
   const bmiLabels = stats ? Object.keys(stats.bmiStats) : [];
@@ -76,6 +108,7 @@ const DataAnalysis = () => {
 
   const CustomBarChart = ({ data }) => (
     <div className="space-y-3">
+      {console.log("data from bar chart", data)}
       {data.map((item, index) => (
         <div key={index} className="flex items-center space-x-3">
           <div className="w-20 text-sm font-medium text-gray-700">{item.name}</div>
@@ -162,11 +195,30 @@ const DataAnalysis = () => {
         <div className="bg-white rounded-xl shadow-lg p-6 mb-8 border border-gray-100">
           <h3 className="text-lg font-semibold text-gray-800 mb-4">Filters & Options</h3>
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-            <select className="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
-              <option>Academic Year 2024-2025</option>
+            <select onChange={(e) => setExamSessionId(e.target.value)} value={examSessionId} className="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
+              {examSessions.length === 0 && <option value="">Không có kỳ thi</option>}
+              {examSessions.length > 0 && examSessions.map(session => (
+                <option key={session._id} value={session._id}>{session.examSessionAcademicYear} </option>
+              ))}
             </select>
-            <select className="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
-              <option>All Classes</option>
+            <select
+              className="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+              value={selectedClass}
+              onChange={e => setSelectedClass(e.target.value)}
+              disabled={classes.length === 0}
+            >
+              <option value="">All</option>
+              {classes
+                .slice()
+                .sort((a, b) => {
+                  const numA = parseInt(a.match(/\d+/)?.[0] || '0', 10);
+                  const numB = parseInt(b.match(/\d+/)?.[0] || '0', 10);
+                  if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+                  return a.toLowerCase().localeCompare(b.toLowerCase(), undefined, { numeric: true });
+                })
+                .map(cls => (
+                  <option key={cls} value={cls}>{cls}</option>
+                ))}
             </select>
             <select className="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
               <option>Health Tracking</option>
@@ -269,7 +321,7 @@ const DataAnalysis = () => {
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold mb-2">
-                {stats ? ((stats.bmiStats?.["Bình thường"] || 0) / stats.total * 100).toFixed(1) : 0}%
+                {stats ? ((stats.bmiStats?.["BT"] || 0) / stats.total * 100).toFixed(1) : 0}%
               </div>
               <div className="text-sm opacity-90">Students with Normal BMI</div>
             </div>

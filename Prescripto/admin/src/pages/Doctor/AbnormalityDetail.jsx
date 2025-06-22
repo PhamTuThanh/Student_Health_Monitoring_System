@@ -2,6 +2,8 @@ import React, { useEffect, useState } from "react";
 import { User, Calendar, Stethoscope, Plus, X, Save, FileText, Pill } from "lucide-react";
 import { useParams, useLocation } from "react-router-dom";
 import axios from "axios";
+import AddPrescription from "../../components/AddPrescription";
+import { useAppContext } from "../../context/AppContext";
 
 const SYMPTOMS = [
   { group: "Consciousness", options: ["Daze", "Pass out", "Loss of consciousness", "Awake"] },
@@ -14,9 +16,9 @@ const SYMPTOMS = [
 ];
 
 export default function AbnormalityDetail() {
-  // Mock data for demonstration - replace with your actual router and API logic
   const { id } = useParams();
   const location = useLocation();
+  const { hideNavbar, showNavbar } = useAppContext();
   const [student, setStudent] = useState(location.state?.student || null);
   const [abnormalities, setAbnormalities] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -42,6 +44,21 @@ export default function AbnormalityDetail() {
       setLoading(false);
     });
   }, [id, showForm]);
+
+  const handleOpenForm = () => {
+    hideNavbar();
+    setShowForm(true);
+  };
+
+  const handleCloseForm = () => {
+    showNavbar();
+    setShowForm(false);
+    // Reset form
+    setDoctorName("");
+    setDate("");
+    setSelectedSymptoms([]);
+    setTreatment("");
+  };
     
 
   const handleSymptomChange = (symptom) => {
@@ -63,12 +80,18 @@ export default function AbnormalityDetail() {
       symptoms: selectedSymptoms,
       temporaryTreatment: treatment,
     });
-    setShowForm(false);
-    // Reset form
-    setDoctorName("");
-    setDate("");
-    setSelectedSymptoms([]);
-    setTreatment("");
+    handleCloseForm();
+  };
+
+  const handleOpenPrescriptionForm = (abnormality) => {
+    hideNavbar();
+    setSelectedAbnormality(abnormality);
+    setShowPrescriptionForm(true);
+  };
+
+  const handleClosePrescriptionForm = () => {
+    showNavbar();
+    setShowPrescriptionForm(false);
   };
 
   return (
@@ -98,7 +121,7 @@ export default function AbnormalityDetail() {
               </div>
             </div>
             <button
-              onClick={() => setShowForm(true)}
+              onClick={handleOpenForm}
               className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-8 py-4 rounded-2xl font-semibold shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300 flex items-center space-x-3"
             >
               <Plus className="w-5 h-5" />
@@ -108,7 +131,7 @@ export default function AbnormalityDetail() {
         </div>
 
         {/* Main Content */}
-        <div className="bg-white rounded-2xl shadow-lg border border-blue-100 p-8">
+        <div className="bg-white rounded-2xl shadow-lg border border-blue-100 p-8 mb-[54px]">
           <div className="flex items-center space-x-3 mb-8">
             <div className="bg-gradient-to-r from-red-500 to-pink-500 p-3 rounded-xl">
               <Stethoscope className="w-6 h-6 text-white" />
@@ -158,10 +181,7 @@ export default function AbnormalityDetail() {
                         </div>
                       </div>
                       <button
-                        onClick={() => {
-                          setSelectedAbnormality(abnormality);
-                          setShowPrescriptionForm(true);
-                        }}
+                        onClick={() => handleOpenPrescriptionForm(abnormality)}
                         className="bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white px-6 py-3 rounded-xl font-semibold shadow-md hover:shadow-lg transform hover:-translate-y-1 transition-all duration-300 flex items-center space-x-2"
                       >
                         <Pill className="w-4 h-4" />
@@ -231,13 +251,13 @@ export default function AbnormalityDetail() {
 
         {/* Modal Form */}
         {showForm && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm p-4">
+          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm p-4">
             <div className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
               <div className="sticky top-0 bg-white border-b border-gray-200 px-8 py-6 rounded-t-3xl">
                 <div className="flex items-center justify-between">
                   <h2 className="text-2xl font-bold text-gray-900">Add New Medical Record</h2>
                   <button
-                    onClick={() => setShowForm(false)}
+                    onClick={handleCloseForm}
                     className="p-2 hover:bg-gray-100 rounded-full transition-colors duration-200"
                   >
                     <X className="w-6 h-6 text-gray-500" />
@@ -318,7 +338,7 @@ export default function AbnormalityDetail() {
                 <div className="flex justify-end space-x-4 pt-6">
                   <button
                     type="button"
-                    onClick={() => setShowForm(false)}
+                    onClick={handleCloseForm}
                     className="px-8 py-3 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl font-semibold transition-colors duration-200"
                   >
                     Cancel
@@ -338,17 +358,8 @@ export default function AbnormalityDetail() {
         )}
 
         {showPrescriptionForm && selectedAbnormality && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
-            <div className="bg-white rounded-2xl p-6 max-w-md">
-              <h3 className="text-lg font-semibold mb-4">Add Prescription</h3>
-              <p className="text-gray-600 mb-4">Prescription form would be implemented here</p>
-              <button
-                onClick={() => setShowPrescriptionForm(false)}
-                className="bg-blue-600 text-white px-4 py-2 rounded-lg"
-              >
-                Close
-              </button>
-            </div>
+          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black bg-opacity-50 p-4">
+            <AddPrescription selectedAbnormality={selectedAbnormality} onClose={handleClosePrescriptionForm} />
           </div>
         )}
       </div>

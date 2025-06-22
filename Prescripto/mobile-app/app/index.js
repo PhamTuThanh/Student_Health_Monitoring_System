@@ -1,12 +1,31 @@
 import * as React from "react";
-import { View, StyleSheet, Text, TouchableOpacity } from "react-native";
+import { View, StyleSheet, Text, TouchableOpacity, Platform } from "react-native";
 import { Video, ResizeMode } from "expo-av";
 import { useRouter } from "expo-router";
+import * as Notifications from "expo-notifications";
+import { useEffect } from 'react';
+
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+  }),
+});
 
 export default function App() {
   const video = React.useRef(null);
   const [status, setStatus] = React.useState({});
   const router = useRouter();
+
+  useEffect(() => {
+    registerForPushNotificationsAsync();
+    // Lắng nghe khi nhận thông báo foreground
+    const subscription = Notifications.addNotificationReceivedListener(notification => {
+      // Xử lý khi nhận thông báo foreground
+    });
+    return () => subscription.remove();
+  }, []);
 
   return (
     <View style={styles.container}>
@@ -43,6 +62,31 @@ export default function App() {
       </View>
     </View>
   );
+}
+
+async function registerForPushNotificationsAsync() {
+  let token;
+  if (Platform.OS === 'android') {
+    await Notifications.setNotificationChannelAsync('default', {
+      name: 'default',
+      importance: Notifications.AndroidImportance.MAX,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: '#FF231F7C',
+    });
+  }
+  const { status: existingStatus } = await Notifications.getPermissionsAsync();
+  let finalStatus = existingStatus;
+  if (existingStatus !== 'granted') {
+    const { status } = await Notifications.requestPermissionsAsync();
+    finalStatus = status;
+  }
+  if (finalStatus !== 'granted') {
+    alert('Failed to get push token for push notification!');
+    return;
+  }
+  token = (await Notifications.getExpoPushTokenAsync()).data;
+  console.log(token);
+  // Gửi token này lên server để gửi push notification
 }
 
 const styles = StyleSheet.create({

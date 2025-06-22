@@ -178,7 +178,7 @@ const Sidebar = () => {
                 <StyledNavLink to="/physical-fitness-by-session" label="Physical Fitness" />
                 <StyledNavLink to="/abnormality" label="Abnormality" />
               </DropdownMenu>
-              <DropdownMenu
+              {/* <DropdownMenu
                 isOpen={isOpen}
                 icon={assets.drug_stock_icon}
                 label="Drug Stock"
@@ -187,8 +187,8 @@ const Sidebar = () => {
               >
                 <StyledNavLink to="/add-drug" label="Add Drug" />
                 <StyledNavLink to="/drug_stock" label="Drug Stock" />
-              </DropdownMenu>
-              {/* <StyledNavLink to="/drug_stock" icon={assets.drug_stock_icon} label="Drug Stock" />   */}
+              </DropdownMenu> */}
+              <StyledNavLink to="/drug_stock" icon={assets.drug_stock_icon} label="Drug Stock" />  
               <StyledNavLink to="/data_analysis" icon={assets.data_analysis_icon} label="Data Analysis" />
               <StyledNavLink to="/doctor_chat" icon={assets.chat_icon} label="Chat" />
             </ul>

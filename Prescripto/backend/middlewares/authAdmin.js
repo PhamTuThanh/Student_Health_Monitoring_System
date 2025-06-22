@@ -1,19 +1,33 @@
 import jwt from 'jsonwebtoken'
 
-const authAdmin = async (req, res, next) => {
+const authAdmin = (req, res, next) => {
     try {
-        const { atoken } = req.headers
-        if (!atoken) {
-            return res.json({ success: false, message: 'Not authorized login again' })
+        let token = null;
+
+        if (req.cookies.aToken) {
+            token = req.cookies.aToken;
+        } else if (req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
+            token = req.headers.authorization.split(' ')[1];
         }
-        const token_decode = jwt.verify(atoken, process.env.JWT_SECRET)
-        if (token_decode.role !== 'admin' || token_decode.email !== process.env.ADMIN_EMAIL) {
-            return res.json({ success: false, message: 'Not authorized login again' })
+
+        if (!token) {
+            return res.status(401).json({ success: false, message: 'Authentication failed: No token provided' });
         }
-        next()
+
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+        if (decoded.role !== 'admin' || decoded.email !== process.env.ADMIN_EMAIL) {
+            return res.status(403).json({ success: false, message: 'Authorization failed: Not an admin' });
+        }
+
+        req.admin = decoded;
+        next();
     } catch (error) {
-        console.log(error)
-        res.json({ success: false, message: error.message })
+        console.log(error);
+        if (error.name === 'JsonWebTokenError') {
+            return res.status(401).json({ success: false, message: 'Authentication failed: Invalid token' });
+        }
+        res.status(500).json({ success: false, message: 'Internal server error' });
     }
 }
 export default authAdmin

@@ -13,6 +13,7 @@
     },
     "android": {
       "package": "com.example.mobileapp",
+      "permissions": ["NOTIFICATIONS"],
       "versionCode": 1,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",

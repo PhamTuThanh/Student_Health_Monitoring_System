@@ -1,7 +1,7 @@
 import express from 'express';
 import { registerUser, loginUser, getProfile, updateProfile, bookAppoinment, listAppoinment, 
 cancelAppoinment,  createPayPalPayment,handlePayPalSuccess,handlePayPalCancel, sendEmail, getUsersForChat, getDoctorsForChat, getPhysicalData, saveChatHistory, getChatHistory,
-getAnnouncements} from '../controllers/userController.js';
+getAnnouncements, forgotPassword, changePassword} from '../controllers/userController.js';
 import { verifyToken } from '../middlewares/auth.js';
 import upload from '../middlewares/multer.js';
 
@@ -24,4 +24,6 @@ userRouter.get('/data-physical/:studentId?', getPhysicalData)
 userRouter.post('/save-chat-history', verifyToken, saveChatHistory)
 userRouter.get('/get-chat-history/:studentId', verifyToken, getChatHistory)
 userRouter.get('/get-announcements', verifyToken, getAnnouncements) 
-export default userRouter;
+userRouter.post('/forgot-password', forgotPassword)
+userRouter.post('/change-password', verifyToken, changePassword)
+export default userRouter;  

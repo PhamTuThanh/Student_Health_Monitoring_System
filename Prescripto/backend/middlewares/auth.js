@@ -4,8 +4,20 @@ import Doctor from '../models/doctorModel.js';
 
 export const verifyToken = async (req, res, next) => {
     try {
-        const token = req.headers.authorization?.split(' ')[1];
-        
+        let token = null;
+
+        if (req.cookies.aToken) {
+            token = req.cookies.aToken;
+        } else if (req.cookies.dToken) {
+            token = req.cookies.dToken;
+        } else if (req.cookies.uToken) {
+            token = req.cookies.uToken;
+        } else if (req.cookies.token) {
+            token = req.cookies.token;
+        } else if (req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
+            token = req.headers.authorization.split(' ')[1];
+        }
+
         if (!token) {
             return res.status(401).json({
                 success: false,

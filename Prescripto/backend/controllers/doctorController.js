@@ -11,6 +11,7 @@ import drugStockModel from '../models/drugStockModel.js';
 import cloudinary from 'cloudinary';
 import examSessionModel from '../models/examSessionModel.js';
 import mongoose from 'mongoose';
+import prescriptionModel from '../models/prescriptionModel.js';
 
 const changeAvailability = async (req, res) => {
     try {
@@ -40,20 +41,48 @@ const loginDoctor = async (req, res)=>{
         const doctor = await doctorModel.findOne({email})
 
         if(!doctor){
-            return res.json ({ success: false, message:'Invalid credentials'})
+            return res.status(401).json ({ success: false, message:'Invalid credentials'})
         }
         const isMatch = await bcrypt.compare(password, doctor.password)
         if(isMatch){
-            const token = jwt.sign({id:doctor._id}, process.env.JWT_SECRET)
-            res.json({success:true, token})
+            const token = jwt.sign({id:doctor._id, role: 'doctor'}, process.env.JWT_SECRET)
+            
+            res.cookie('dToken', token, {
+                httpOnly: true,
+                secure: process.env.NODE_ENV !== 'development', // Use secure cookies in production
+                sameSite: 'strict', 
+                maxAge: 3 * 24 * 60 * 60 * 1000 // 3 days
+            });
+
+            res.status(200).json({
+                success:true, 
+                message:'Doctor logged in successfully',
+                token: token // Keep this for easier testing in Postman
+            })
         }else{
-            res.json ({ success: false, message:'Invalid credentials'})
+            res.status(401).json ({ success: false, message:'Invalid credentials'})
         }
     } catch (error) {
         console.log(error);
-        res.json({ success: false, message: error.message });
+        res.status(500).json({ success: false, message: 'Internal server error' });
     }
 }
+
+const logoutDoctor = (req, res) => {
+    try {
+        res.cookie('dToken', '', {
+            httpOnly: true,
+            expires: new Date(0),
+            secure: process.env.NODE_ENV !== 'development',
+            sameSite: 'strict',
+        });
+        res.status(200).json({ success: true, message: 'Doctor logged out successfully' });
+    } catch (error) {
+        console.error('Logout Doctor Error:', error);
+        res.status(500).json({ success: false, message: 'Internal Server Error' });
+    }
+};
+
 //api to get doctor appoinments for dpoctor panel
 const appoinmentsDoctor = async (req,res)=>{
     try {
@@ -225,47 +254,51 @@ function getDanhGiaHeartRate(heartRate) {
 }
 //-----------------controller for physical fitness-----------------
 const savePhysicalFitness = async (req, res) => {
-  try {
-    const data = req.body;
-    const height = parseFloat(data.height) || 0;
-    const weight = parseFloat(data.weight) || 0;
-    const systolic = parseFloat(data.systolic) || 0;
-    const diastolic = parseFloat(data.diastolic) || 0;
-    const heartRate = parseFloat(data.heartRate) || 0;
+    try {
+        const { studentId, examSessionId, ...data } = req.body;
 
-    data.zScoreCC = calculateZScoreCC(height);
-    data.danhGiaCC = getDanhGiaCC(data.zScoreCC);
-    data.zScoreCN = calculateZScoreCN(weight);
-    data.danhGiaCN = getDanhGiaCN(data.zScoreCN);
-    data.bmi = calculateBMI(weight, height);
-    data.danhGiaBMI = getDanhGiaBMI(data.bmi);
-    data.danhGiaTTH = getDanhGiaTTH(systolic, diastolic);
-    data.danhGiaHeartRate = getDanhGiaHeartRate(heartRate);
-    data.zScoreCNCc = (data.zScoreCN && data.zScoreCC) ? (parseFloat(data.zScoreCN) - parseFloat(data.zScoreCC)).toFixed(2) : "";
- 
-    await physicalFitnessModel.findOneAndUpdate(
-      { studentId: data.studentId, followDate: data.followDate, examSessionId: data.examSessionId },
-      data,
-      { upsert: true, new: true }
-    );
-    res.json({ success: true, message: 'Save success' });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ success: false, message: 'Error server!' });
-  }
+        if (!studentId || !examSessionId) {
+            return res.status(400).json({ success: false, message: "Student ID and Exam Session ID are required." });
+        }
+
+        const fitnessData = await physicalFitnessModel.findOneAndUpdate(
+            { studentId: studentId, examSessionId: examSessionId }, // Query to find the document
+            { $set: data }, // Data to update
+            { 
+                new: true, // Return the updated document
+                upsert: true, // Create a new document if one doesn't exist
+                setDefaultsOnInsert: true // Apply model defaults on insert
+            }
+        );
+
+        res.json({ success: true, message: 'Data saved successfully', data: fitnessData });
+    } catch (error) {
+        console.error("Error saving physical fitness data:", error);
+        res.status(500).json({ success: false, message: 'Error saving data', error: error.message });
+    }
 };
 const getAllPhysicalFitness = async (req, res) => {
+  try {
+    const data = await physicalFitnessModel.find();
+    res.status(200).json({ success: true, data });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Error fetching data', error: err.message });
+  }
+};
+const getPhysicalFitnessStatus = async (req, res) => {
     try {
-      const data = await physicalFitnessModel.find({});
-      res.json({ success: true, data });
-    } catch (error) {
-      res.status(500).json({ success: false, message: 'Error server!' });
-    }
-  };
-
-const getPhysicalFitness = async (req, res) => {
-    try {
-        const data = await physicalFitnessModel.find({});
+        const { examSessionId,cohort } = req.query;
+        const filter = {};
+        if(examSessionId){
+            filter.examSessionId = examSessionId;
+        }
+        if(cohort){
+            filter.cohort = cohort;
+        }else{
+            filter.examSessionId = examSessionId;
+            filter.cohort = cohort;
+        }
+        const data = await physicalFitnessModel.find(filter);
         const total = data.length;
         const daTDSK = data.filter(d=>d.height && d.weight).length;
         const bmiStats = {};
@@ -293,379 +326,493 @@ const getPhysicalFitness = async (req, res) => {
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
-};
-const importPhysicalFitnessExcel = async (req, res) => {
-  try {
-    const { examSessionId } = req.body;
-    
-    // Validate examSessionId
-    if (!examSessionId) {
-      return res.status(400).json({ success: false, message: 'Exam session ID is required' });
-    }
-    
-    // Validate file upload
-    if (!req.file) {
-      return res.status(400).json({ success: false, message: 'No file uploaded' });
-    }
-
-    // Validate examSessionId exists
-    const examSession = await examSessionModel.findById(examSessionId);
-    if (!examSession) {
-      return res.status(400).json({ success: false, message: 'Exam session not found' });
-    }
-
-    const xlsx = (await import('xlsx')).default || require('xlsx');
-    const workbook = xlsx.readFile(req.file.path);
-    const sheetName = workbook.SheetNames[0];
-    const sheet = workbook.Sheets[sheetName];
-    let data = xlsx.utils.sheet_to_json(sheet);
-
-    // Validate data structure
-    if (!data || data.length === 0) {
-      return res.status(400).json({ success: false, message: 'Excel file is empty or invalid format' });
-    }
-
-    // Validate required fields
-    const requiredFields = ['studentId', 'height', 'weight'];
-    const invalidRows = [];
-    const validData = [];
-
-    data.forEach((row, index) => {
-      const missingFields = requiredFields.filter(field => !row[field]);
-      if (missingFields.length > 0) {
-        invalidRows.push({
-          row: index + 1,
-          missingFields,
-          studentId: row.studentId || 'N/A'
-        });
-      } else {
-        validData.push(row);
-      }
-    });
-
-    if (invalidRows.length > 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Some rows are missing required fields',
-        invalidRows
-      });
-    }
-
-    // Check for duplicates and prepare data
-    const processedData = [];
-    const duplicateStudentIds = [];
-    const existingRecords = await physicalFitnessModel.find({ examSessionId });
-
-    for (const row of validData) {
-      const studentId = String(row.studentId).replace(/^['"]+|['"]+$/g, '').trim();
+  };
+  const importPhysicalFitnessExcel = async (req, res) => {
+    try {
+      const { examSessionId } = req.body;
       
-      // Check if record already exists
-      const existingRecord = existingRecords.find(record => 
-        String(record.studentId) === studentId
-      );
-
-      if (existingRecord) {
-        duplicateStudentIds.push(studentId);
-        continue;
+      // Validate examSessionId
+      if (!examSessionId) {
+        return res.status(400).json({ success: false, message: 'Exam session ID is required' });
       }
-
-      // Calculate derived fields
-      const height = parseFloat(row.height) || 0;
-      const weight = parseFloat(row.weight) || 0;
-      const systolic = parseFloat(row.systolic) || 0;
-      const diastolic = parseFloat(row.diastolic) || 0;
-      const heartRate = parseFloat(row.heartRate) || 0;
-
-      const zScoreCC = calculateZScoreCC(height);
-      const zScoreCN = calculateZScoreCN(weight);
-      const bmi = calculateBMI(weight, height);
-      const zScoreCNCc = (zScoreCN && zScoreCC) 
-        ? (parseFloat(zScoreCN) - parseFloat(zScoreCC)).toFixed(2) 
-        : "";
-
-      processedData.push({
-        studentId,
-        examSessionId,
-        gender: row.gender || "",
-        followDate: row.followDate || "",
-        height,
-        weight,
-        zScoreCC,
-        danhGiaCC: getDanhGiaCC(zScoreCC),
-        zScoreCN,
-        danhGiaCN: getDanhGiaCN(zScoreCN),
-        zScoreCNCc,
-        bmi,
-        danhGiaBMI: getDanhGiaBMI(bmi),
-        systolic,
-        diastolic,
-        danhGiaTTH: getDanhGiaTTH(systolic, diastolic),
-        heartRate,
-        danhGiaHeartRate: getDanhGiaHeartRate(heartRate),
+      
+      // Validate file upload
+      if (!req.file) {
+        return res.status(400).json({ success: false, message: 'No file uploaded' });
+      }
+  
+      // Validate examSessionId exists
+      const examSession = await examSessionModel.findById(examSessionId);
+      if (!examSession) {
+        return res.status(400).json({ success: false, message: 'Exam session not found' });
+      }
+  
+      const xlsx = (await import('xlsx')).default || require('xlsx');
+      const workbook = xlsx.readFile(req.file.path);
+      const sheetName = workbook.SheetNames[0];
+      const sheet = workbook.Sheets[sheetName];
+      let data = xlsx.utils.sheet_to_json(sheet);
+  
+      // Validate data structure
+      if (!data || data.length === 0) {
+        return res.status(400).json({ success: false, message: 'Excel file is empty or invalid format' });
+      }
+  
+      // Validate required fields
+      const requiredFields = ['studentId', 'height', 'weight'];
+      const invalidRows = [];
+      const validData = [];
+  
+      data.forEach((row, index) => {
+        const missingFields = requiredFields.filter(field => !row[field]);
+        if (missingFields.length > 0) {
+          invalidRows.push({
+            row: index + 1,
+            missingFields,
+            studentId: row.studentId || 'N/A'
+          });
+        } else {
+          validData.push(row);
+        }
+      });
+  
+      if (invalidRows.length > 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Some rows are missing required fields',
+          invalidRows
+        });
+      }
+  
+      // Check for duplicates and prepare data
+      const processedData = [];
+      const duplicateStudentIds = [];
+      const existingRecords = await physicalFitnessModel.find({ examSessionId });
+  
+      for (const row of validData) {
+        const studentId = String(row.studentId).replace(/^['"]+|['"]+$/g, '').trim();
+        
+        // Check if record already exists
+        const existingRecord = existingRecords.find(record => 
+          String(record.studentId) === studentId
+        );
+  
+        if (existingRecord) {
+          duplicateStudentIds.push(studentId);
+          continue;
+        }
+  
+        // Calculate derived fields
+        const height = parseFloat(row.height) || 0;
+        const weight = parseFloat(row.weight) || 0;
+        const systolic = parseFloat(row.systolic) || 0;
+        const diastolic = parseFloat(row.diastolic) || 0;
+        const heartRate = parseFloat(row.heartRate) || 0;
+  
+        const zScoreCC = calculateZScoreCC(height);
+        const zScoreCN = calculateZScoreCN(weight);
+        const bmi = calculateBMI(weight, height);
+        const zScoreCNCc = (zScoreCN && zScoreCC) 
+          ? (parseFloat(zScoreCN) - parseFloat(zScoreCC)).toFixed(2) 
+          : "";
+  
+        processedData.push({
+          studentId,
+          examSessionId,
+          cohort: row.cohort || "",
+          gender: row.gender || "",
+          followDate: row.followDate || "",
+          height,
+          weight,
+          zScoreCC,
+          danhGiaCC: getDanhGiaCC(zScoreCC),
+          zScoreCN,
+          danhGiaCN: getDanhGiaCN(zScoreCN),
+          zScoreCNCc,
+          bmi,
+          danhGiaBMI: getDanhGiaBMI(bmi),
+          systolic,
+          diastolic,
+          danhGiaTTH: getDanhGiaTTH(systolic, diastolic),
+          heartRate,
+          danhGiaHeartRate: getDanhGiaHeartRate(heartRate),
+        });
+      }
+  
+      // Insert new records
+      let insertedCount = 0;
+      if (processedData.length > 0) {
+        const result = await physicalFitnessModel.insertMany(processedData);
+        insertedCount = result.length;
+      }
+  
+      // Clean up uploaded file
+      const fs = await import('fs');
+      if (fs.existsSync(req.file.path)) {
+        fs.unlinkSync(req.file.path);
+      }
+  
+      // Return response with detailed information
+      const response = {
+        success: true,
+        message: `Import completed successfully!`,
+        summary: {
+          totalRows: data.length,
+          validRows: validData.length,
+          insertedCount,
+          duplicateCount: duplicateStudentIds.length,
+          skippedCount: invalidRows.length
+        }
+      };
+  
+      if (duplicateStudentIds.length > 0) {
+        response.duplicates = duplicateStudentIds;
+      }
+  
+      if (invalidRows.length > 0) {
+        response.invalidRows = invalidRows;
+      }
+  
+      res.json(response);
+  
+    } catch (error) {
+      console.error('Import Physical Fitness Excel Error:', error);
+      
+      // Clean up uploaded file on error
+      if (req.file && req.file.path) {
+        try {
+          const fs = await import('fs');
+          if (fs.existsSync(req.file.path)) {
+            fs.unlinkSync(req.file.path);
+          }
+        } catch (cleanupError) {
+          console.error('Error cleaning up file:', cleanupError);
+        }
+      }
+      
+      res.status(500).json({ 
+        success: false, 
+        message: 'Import failed: ' + error.message 
       });
     }
+  };
 
-    // Insert new records
-    let insertedCount = 0;
-    if (processedData.length > 0) {
-      const result = await physicalFitnessModel.insertMany(processedData);
-      insertedCount = result.length;
-    }
-
-    // Clean up uploaded file
-    const fs = await import('fs');
-    if (fs.existsSync(req.file.path)) {
-      fs.unlinkSync(req.file.path);
-    }
-
-    // Return response with detailed information
-    const response = {
-      success: true,
-      message: `Import completed successfully!`,
-      summary: {
-        totalRows: data.length,
-        validRows: validData.length,
-        insertedCount,
-        duplicateCount: duplicateStudentIds.length,
-        skippedCount: invalidRows.length
-      }
-    };
-
-    if (duplicateStudentIds.length > 0) {
-      response.duplicates = duplicateStudentIds;
-    }
-
-    if (invalidRows.length > 0) {
-      response.invalidRows = invalidRows;
-    }
-
-    res.json(response);
-
-  } catch (error) {
-    console.error('Import Physical Fitness Excel Error:', error);
-    
-    // Clean up uploaded file on error
-    if (req.file && req.file.path) {
-      try {
-        const fs = await import('fs');
-        if (fs.existsSync(req.file.path)) {
-          fs.unlinkSync(req.file.path);
-        }
-      } catch (cleanupError) {
-        console.error('Error cleaning up file:', cleanupError);
-      }
-    }
-    
-    res.status(500).json({ 
-      success: false, 
-      message: 'Import failed: ' + error.message 
-    });
-  }
-};
 //-----------------controller for abnormality-----------------
 const getAllAbnormality = async (req, res) => {
     try {
-        const data = await abnormalityModel.find({});
-        res.json({ success: true, data });
+        const abnormalities = await Abnormality.find({});
+        res.status(200).json({ success: true, data: abnormalities });
     } catch (error) {
-        res.status(500).json({ success: false, message: 'Lỗi server!' });
+        res.status(500).json({ success: false, message: 'Server error' });
     }
-}
+};
+
 const createAbnormality = async (req, res) => {
     try {
-       // console.log("Received body:", req.body);
-    
-        const abnormality = new Abnormality({
-            student: req.body.student, // ObjectId
-            studentId: req.body.studentId,
-            studentName: req.body.studentName,  
-            doctorName: req.body.doctorName,
-            date: req.body.date,
-            symptoms: req.body.symptoms,
-            temporaryTreatment: req.body.temporaryTreatment,
-          });
-          await abnormality.save();
-      //  console.log("Saved abnormality:", abnormality);
-        res.status(201).json({ success: true, data: abnormality });
-      } catch (err) {
-        console.log("Error:", err);
-        res.status(500).json({ success: false, message: err.message });
-      }
-}
+        const newAbnormality = new Abnormality(req.body);
+        await newAbnormality.save();
+        res.status(201).json({ success: true, message: 'Abnormality created', data: newAbnormality });
+    } catch (error) {
+        res.status(400).json({ success: false, message: 'Failed to create abnormality', error: error.message });
+    }
+};
+
 const getAbnormalityByStudentId = async (req, res) => {
-   try {
-    const { studentId } = req.params;
-    const abnormality = await Abnormality.find({ studentId: studentId });
-    res.json({ success: true, data: abnormality });
-   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-   }
-}
-//-----------------controller for drug stock-----------------
-
-const addDrug = async (req, res) => {
-  try {
-    const {
-      drugName,
-      drugCode,
-      drugType,
-      drugUnit,
-      inventoryQuantity,
-      expiryDate,
-      supplierName,
-      notes
-    } = req.body;
-    const drugImage = req.file;
-
-    // Validate required fields
-    if (!drugName || !drugCode || !drugUnit || !inventoryQuantity || !expiryDate || !drugType) {
-      return res.status(400).json({ success: false, message: "Missing required fields!" });
-    }
-
-    // Optionally: Validate inventoryQuantity is a number
-    if (isNaN(inventoryQuantity) || Number(inventoryQuantity) < 0) {
-      return res.status(400).json({ success: false, message: "Inventory quantity must be a non-negative number!" });
-    }
-
-    // Optionally: Validate expiryDate is a valid date
-    if (isNaN(Date.parse(expiryDate))) {
-      return res.status(400).json({ success: false, message: "Expiry date is invalid!" });
-    }
-    //upload image to cloudinary
-    let imageUrl = 'https://i.imgur.com/1Q9Z1Zm.png'; 
-        if (drugImage) {
-            const imageUpload = await cloudinary.uploader.upload(drugImage.path, {resource_type: "image" });
-            imageUrl = imageUpload.secure_url;
+    try {
+        const { studentId } = req.params;
+        const abnormalities = await Abnormality.find({ studentId });
+        if (!abnormalities.length) {
+            return res.status(404).json({ success: false, message: 'No abnormalities found for this student' });
         }
-
-    // Create new drug
-    const drug = await drugStockModel.create({
-      drugImage: imageUrl,
-      drugName: drugName.trim(),
-      drugCode: drugCode.trim(),
-      drugType: drugType.trim(),
-      drugUnit: drugUnit.trim(),
-      inventoryQuantity: Number(inventoryQuantity),
-      expiryDate: new Date(expiryDate),
-      supplierName: supplierName ? supplierName.trim() : "",
-      notes: notes ? notes.trim() : ""
-    });
-
-    res.status(201).json({ success: true, message: "Drug added successfully!", data: drug });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
+        res.status(200).json({ success: true, data: abnormalities });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+};
+//-----------------controller for drug stock-----------------
+const addDrug = async (req, res) => {
+    try {
+        const {
+            drugName, drugCode, drugType, drugUnit,
+            inventoryQuantity, expiryDate, supplierName, notes
+        } = req.body;
+        if (!req.file) {
+            return res.status(400).json({
+                success: false,
+                message: 'No file uploaded.'
+            });
+        }
+        const file = req.file;
+        const result = await cloudinary.v2.uploader.upload(file.path, {
+            folder: 'drug_images'
+        });
+        if (!result) {
+            return res.status(500).json({
+                success: false,
+                message: 'Failed to upload image'
+            });
+        }
+        const newDrug = new drugStockModel({
+            drugImage: result.secure_url,
+            drugName,
+            drugCode,
+            drugType,
+            drugUnit,
+            inventoryQuantity,
+            expiryDate,
+            supplierName,
+            notes
+        });
+        await newDrug.save();
+        res.status(201).json({
+            success: true,
+            message: 'Drug added successfully',
+            data: newDrug
+        });
+    } catch (error) {
+        res.status(400).json({
+            success: false,
+            message: 'Failed to add drug',
+            error: error.message
+        });
+    }
 };
 const importDrugExcel = async (req, res) => {
-  try {
-    if (!req.file) return res.status(400).json({ success: false, message: 'No file uploaded' });
-    const xlsx = (await import('xlsx')).default || require('xlsx');
-    const workbook = xlsx.readFile(req.file.path);
-    const sheetName = workbook.SheetNames[0];
-    const sheet = workbook.Sheets[sheetName];
-    let data = xlsx.utils.sheet_to_json(sheet);
-
-    // Validate required fields
-    const requiredFields = ['drugName', 'drugCode', 'drugType', 'drugUnit', 'inventoryQuantity', 'expiryDate'];
-    const invalidRows = data.filter(row => {
-      return requiredFields.some(field => !row[field]);
-    });
-
-    if (invalidRows.length > 0) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Some rows are missing required fields',
-        invalidRows 
-      });
+    if (!req.file) {
+        return res.status(400).json({
+            success: false,
+            message: 'No file uploaded.'
+        });
     }
-
-    // Process each row
-    const drugs = await Promise.all(data.map(async (row) => {
-      const drug = {
-        drugImage: 'https://i.imgur.com/1Q9Z1Zm.png', // Default image
-        drugName: row.drugName?.trim(),
-        drugCode: row.drugCode?.trim(),
-        drugType: row.drugType?.trim(),
-        drugUnit: row.drugUnit?.trim(),
-        inventoryQuantity: Number(row.inventoryQuantity),
-        expiryDate: new Date(row.expiryDate),
-        supplierName: row.supplierName?.trim() || "",
-        notes: row.notes?.trim() || ""
-      };
-      return drugStockModel.create(drug);
-    }));
-
-    res.status(201).json({ 
-      success: true, 
-      message: `Successfully imported ${drugs.length} drugs`, 
-      data: drugs 
-    });
-  } catch (error) {
-    console.error('Import error:', error);
-    res.status(500).json({ success: false, message: error.message });
-  }
+    try {
+        const workbook = xlsx.read(req.file.buffer, { type: 'buffer' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const data = xlsx.utils.sheet_to_json(worksheet);
+        
+        const requiredColumns = ['drugName', 'drugCode', 'drugType', 'drugUnit', 'inventoryQuantity', 'expiryDate', 'supplierName'];
+        if (data.length > 0) {
+            const header = Object.keys(data[0]);
+            const missingColumns = requiredColumns.filter(col => !header.includes(col));
+            if (missingColumns.length > 0) {
+                return res.status(400).json({
+                    success: false,
+                    message: `Missing required columns: ${missingColumns.join(', ')}`
+                });
+            }
+        } else {
+            return res.status(400).json({ success: false, message: 'Excel file is empty.' });
+        }
+        
+        await drugStockModel.insertMany(data);
+        res.status(201).json({
+            success: true,
+            message: 'Drugs imported successfully',
+            data
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'Error processing Excel file',
+            error: error.message
+        });
+    }
 };
 
 const getDrugStock = async (req, res) => {
-  try {
-    const drugs = await drugStockModel.find({}).sort({ createdAt: -1 });
-    res.json({ success: true, data: drugs });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
+    try {
+        const drugs = await drugStockModel.find({});
+        res.status(200).json({ success: true, data: drugs });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
 };
+
 const deleteDrug = async (req, res) => {
-  try {
-    const { drugId } = req.params;
-    await drugStockModel.findByIdAndDelete(drugId);
-    res.json({ success: true, message: 'Drug deleted successfully!' });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
+    try {
+        const { id } = req.params;
+        await drugStockModel.findByIdAndDelete(id);
+        res.status(200).json({ success: true, message: 'Drug deleted' });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
 };
 const updateDrug = async (req, res) => {
-  try {
-    const { drugId } = req.params;
-    const { drugName, drugCode, drugType, drugUnit, inventoryQuantity, expiryDate, supplierName, notes } = req.body;
-    await drugStockModel.findByIdAndUpdate(drugId, { drugName, drugCode, drugType, drugUnit, inventoryQuantity, expiryDate, supplierName, notes });
-    res.json({ success: true, message: 'Drug updated successfully!' });
-  }catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
-};
-const getUsersForChat = async (req, res) => {
-  try {
-    const users = await userModel.find({});
-    res.json({ success: true, data: users });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
-};
-// Lấy danh sách physical fitness theo examSessionId
-const getPhysicalFitnessBySession = async (req, res) => {
-  try {
-    const { examSessionId } = req.query;
-    if (!examSessionId) {
-      return res.status(400).json({ success: false, message: "Missing examSessionId" });
+    try {
+        let { _id } = req.params;
+        
+        // Xử lý trường hợp id là object
+        if (typeof _id === 'object' && _id !== null) {
+            console.log("ID is object:", _id);
+            // Nếu id là object, thử lấy giá trị đầu tiên
+            _id = Object.values(_id)[0] || _id.toString();
+        }
+        
+        // Kiểm tra id có hợp lệ không
+        if (!_id || _id === 'undefined') {
+            console.log("Invalid ID received:", _id);
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Invalid or missing ID parameter.' 
+            });
+        }
+        
+        console.log("Processing ID:", _id, "Type:", typeof _id);
+        const updateData = req.body;
+
+        // Kiểm tra xem có dữ liệu để update không
+        if (!updateData || Object.keys(updateData).length === 0) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'No data provided for update.' 
+            });
+        }
+
+        // Tìm và cập nhật drug, trả về document mới
+        const updatedDrug = await drugStockModel.findByIdAndUpdate(
+            _id, 
+            updateData, 
+            { 
+                new: true,           // Trả về document đã cập nhật
+                runValidators: true  // Chạy validation của schema
+            }
+        );
+
+        if (!updatedDrug) {
+            console.log("Drug not found with ID:", _id);
+            return res.status(404).json({ 
+                success: false, 
+                message: 'Drug not found with the provided ID.' 
+            });
+        }
+
+        res.status(200).json({ 
+            success: true, 
+            message: 'Drug updated successfully!', 
+            data: updatedDrug 
+        });
+        
+    } catch (error) {
+        console.error("Update drug error:", error);
+        res.status(400).json({ 
+            success: false, 
+            message: 'Update failed', 
+            error: error.message 
+        });
     }
-    // Populate studentId để lấy thông tin sinh viên nếu cần
-    const data = await physicalFitnessModel.find({ 
-      examSessionId: new mongoose.Types.ObjectId(examSessionId)
-    }).populate('studentId');
-    res.json({ success: true, data });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
+};
+
+//-----------------controller for chat-----------------
+const getUsersForChat = async (req, res) => {
+    try {
+        const loggedInUserId = req.user._id;
+        const filteredUsers = await userModel.find({ _id: { $ne: loggedInUserId } }).select("-password");
+        res.status(200).json(filteredUsers);
+    } catch (error) {
+        console.error("Error in getUsersForSidebar: ", error.message);
+        res.status(500).json({ error: "Internal server error" });
+    }
+};
+const getPhysicalFitnessBySession = async (req, res) => {
+    try {
+        const { examSessionId } = req.query;
+        if (!examSessionId) {
+            return res.status(400).json({
+                success: false,
+                message: 'examSessionId is required'
+            });
+        }
+        const data = await physicalFitnessModel.find({ examSessionId });
+        res.status(200).json({ success: true, data });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'Error fetching physical fitness data',
+            error: error.message
+        });
+    }
 };
 const getListExamSession = async (req, res) => {
-  try {
-    const data = await examSessionModel.find({}).sort({ examSessionCreatedAt: -1 });
-    res.json({ success: true, data });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
+    try {
+        const examSessions = await examSessionModel.find({}).sort({ createdAt: -1 });
+        res.status(200).json({ success: true, data: examSessions });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'Error fetching exam sessions',
+            error: error.message
+        });
+    }
 };
-export { changeAvailability, doctorList, loginDoctor, appoinmentsDoctor, appoinmentComplete, appoinmentCancel, doctorDashboard, doctorProfile,
-     updateDoctorProfile, refundStatus, savePhysicalFitness, getAllPhysicalFitness, getAllAbnormality, createAbnormality, getAbnormalityByStudentId, getPhysicalFitness,
-     importPhysicalFitnessExcel, addDrug, importDrugExcel, getDrugStock, deleteDrug, updateDrug, getUsersForChat, getPhysicalFitnessBySession, getListExamSession };
+const addPrescription = async (req, res) => {
+    try {
+        const {
+            abnormalityId,
+            studentId,
+            doctorName,
+            prescriptionDate,
+            diagnosis,
+            medicines,
+            notes
+        } = req.body;
+
+        if (!abnormalityId || !studentId || !doctorName || !medicines || medicines.length === 0) {
+            return res.status(400).json({ success: false, message: "Missing required fields." });
+        }
+
+        // --- Stock Validation ---
+        for (const med of medicines) {
+            const drug = await drugStockModel.findById(med.drugId);
+            if (!drug) {
+                return res.status(404).json({ success: false, message: `Drug with ID ${med.drugId} not found.` });
+            }
+            // Simple validation: assumes 1 unit per dosage.
+            // You might need more complex logic here based on your dosage string (e.g., "2 tablets").
+            const quantityToPrescribe = 1; 
+            if (drug.inventoryQuantity < quantityToPrescribe) {
+                return res.status(400).json({ success: false, message: `Not enough stock for ${drug.drugName}. Only ${drug.inventoryQuantity} left.` });
+            }
+        }
+
+        // --- Create Prescription ---
+        const newPrescription = new prescriptionModel({
+            abnormalityId,
+            studentId,
+            doctorName,
+            prescriptionDate,
+            diagnosis,
+            medicines,
+            notes
+        });
+        await newPrescription.save();
+
+        // --- Update Stock ---
+        for (const med of medicines) {
+            const quantityToPrescribe = 1; // Corresponds to the logic above
+            await drugStockModel.findByIdAndUpdate(med.drugId, {
+                $inc: { inventoryQuantity: -quantityToPrescribe }
+            });
+        }
+
+        res.status(201).json({ success: true, message: "Prescription created and stock updated successfully.", data: newPrescription });
+
+    } catch (error) {
+        console.error("Error creating prescription:", error);
+        res.status(500).json({ success: false, message: 'Server Error: ' + error.message });
+    }
+};
+
+export {
+    changeAvailability, doctorList, loginDoctor, appoinmentsDoctor,
+    appoinmentCancel, appoinmentComplete,doctorDashboard,doctorProfile,
+    updateDoctorProfile, refundStatus, savePhysicalFitness,
+    getAllPhysicalFitness, getPhysicalFitnessStatus, importPhysicalFitnessExcel,
+    getAllAbnormality, createAbnormality, getAbnormalityByStudentId,
+    addDrug, importDrugExcel, getDrugStock, deleteDrug, updateDrug,
+    getUsersForChat,
+    getPhysicalFitnessBySession,
+    getListExamSession,
+    logoutDoctor,
+    addPrescription
+}
 

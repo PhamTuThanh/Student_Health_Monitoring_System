@@ -7,14 +7,15 @@ let socket;
 export const initializeSocket = async () => {
     try {
         const token = await AsyncStorage.getItem("token");
-        const userId = await AsyncStorage.getItem("userId");
-        
+        if (!token) {
+            console.error("No token found, cannot connect socket.");
+            return null;
+        }
         if (!socket) {
+            console.log("Socket connecting with token:", token);
             socket = io(BACKEND_URL, {
-                query: { userId },
-                extraHeaders: {
-                    Authorization: `Bearer ${token}`
-                }
+                transports: ['websocket','polling'],  
+                auth: { token }
             });
 
             socket.on("connect", () => {

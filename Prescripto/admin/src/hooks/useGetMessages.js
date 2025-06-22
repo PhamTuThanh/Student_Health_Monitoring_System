@@ -1,48 +1,36 @@
 import { useEffect, useState } from "react";
 import useConversation from "../zustand/useConversation";
 import toast from "react-hot-toast";
+import axios from "axios";
+axios.defaults.withCredentials = true;
 
 const useGetMessages = () => {
 	const [loading, setLoading] = useState(false);
 	const { messages, setMessages, selectedConversation } = useConversation();
     const backendUrl = import.meta.env.VITE_BACKEND_URL;
-    const dToken = localStorage.getItem("dToken");
 
 	useEffect(() => {
 		const getMessages = async () => {
+			if (!selectedConversation?._id) return;
 			setLoading(true);
 			try {
-				// Check if token exists
-				if (!dToken) {
-					throw new Error("Authentication token is missing. Please log in again.");
-				}
-				
-				console.log("Using token:", dToken);
-				
-				const res = await fetch(`${backendUrl}/api/messages/${selectedConversation._id}`, {
-					headers:{
-						"Authorization": `Bearer ${dToken}`
-					}
+				const res = await axios.get(`${backendUrl}/api/messages/${selectedConversation._id}`, {
+					withCredentials: true
 				});
 				
-				if (!res.ok) {
-					throw new Error(`Request failed with status ${res.status}: ${res.statusText}`);
-				}
-				
-				const data = await res.json();
-				console.log("data tesst: ", data);
-				if (data.error) throw new Error(data.error);
-				setMessages(data);
+				if (res.data.error) throw new Error(res.data.error);
+				setMessages(res.data);
+
 			} catch (error) {
-				console.error("Message fetch error:", error);
-				toast.error(error.message);
+				const errorMessage = error.response?.data?.message || error.message;
+				toast.error(errorMessage);
 			} finally {
 				setLoading(false);
 			}
 		};
 
-		if (selectedConversation?._id) getMessages();
-	}, [selectedConversation?._id, setMessages]);
+		getMessages();
+	}, [selectedConversation?._id, setMessages, backendUrl]);
 
 	return { messages, loading };
 };

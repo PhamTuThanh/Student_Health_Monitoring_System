@@ -95,7 +95,7 @@ const MessageInput = () => {
 			</div>
 
 			{/* Custom styles */}
-			<style jsx>{`
+			<style >{`
 				/* Custom scrollbar cho textarea */
 				textarea::-webkit-scrollbar {
 					width: 4px;

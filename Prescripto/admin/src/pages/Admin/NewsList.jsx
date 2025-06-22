@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
+import { useAppContext } from '../../context/AppContext';
 
 const BACKEND_URL = 'http://localhost:9000/api/admin'; // Đổi lại nếu backend khác
 
 const NewsList = () => {
+  const { hideNavbar, showNavbar } = useAppContext();
   const [news, setNews] = useState([]);
   const [openDialog, setOpenDialog] = useState(false);
   const [selectedNews, setSelectedNews] = useState(null);
@@ -18,15 +20,11 @@ const NewsList = () => {
     date: '',
   });
 
-  const aToken = localStorage.getItem('aToken');
-
   // Fetch news from API
   const fetchNews = async () => {
     setLoading(true);
     try {
-      const res = await axios.get(`${BACKEND_URL}/get-news`, {
-        headers: { aToken }
-      });
+      const res = await axios.get(`${BACKEND_URL}/get-news`);
       setNews(res.data.news || []);
     } catch (err) {
       setNews([]);
@@ -45,6 +43,7 @@ const NewsList = () => {
   );
 
   const handleOpenDialog = (newsItem = null) => {
+    hideNavbar();
     if (newsItem) {
       setSelectedNews(newsItem);
       setFormData({
@@ -68,6 +67,7 @@ const NewsList = () => {
   };
 
   const handleCloseDialog = () => {
+    showNavbar();
     setOpenDialog(false);
     setSelectedNews(null);
     setFormData({
@@ -107,13 +107,9 @@ const NewsList = () => {
 
       if (selectedNews) {
         data.append('id', selectedNews._id);
-        await axios.post(`${BACKEND_URL}/update-news`, data, {
-          headers: { aToken }
-        });
+        await axios.post(`${BACKEND_URL}/update-news`, data);
       } else {
-        await axios.post(`${BACKEND_URL}/add-news`, data, {
-          headers: { aToken }
-        });
+        await axios.post(`${BACKEND_URL}/add-news`, data);
       }
       fetchNews();
       handleCloseDialog();
@@ -127,9 +123,7 @@ const NewsList = () => {
     if (window.confirm('Bạn có chắc chắn muốn xóa tin tức này?')) {
       setLoading(true);
       try {
-        await axios.post(`${BACKEND_URL}/delete-news`, { id }, {
-          headers: { aToken }
-        });
+        await axios.post(`${BACKEND_URL}/delete-news`, { id });
         fetchNews();
       } catch (err) {
         alert('Không thể xóa tin tức');
@@ -406,14 +400,7 @@ const NewsList = () => {
                 <h2 className="text-2xl font-bold text-white">
                   {selectedNews ? 'Chỉnh sửa tin tức' : 'Thêm tin tức mới'}
                 </h2>
-                <button
-                  onClick={handleCloseDialog}
-                  className="p-2 text-white/80 hover:text-white hover:bg-white/20 rounded-2xl transition-all duration-300"
-                >
-                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
+                
               </div>
             </div>
             <form onSubmit={handleSubmit} className="space-y-6">

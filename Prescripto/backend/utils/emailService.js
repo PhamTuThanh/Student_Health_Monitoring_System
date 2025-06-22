@@ -2,7 +2,7 @@ import nodemailer from 'nodemailer';
 import doctorModel from '../models/doctorModel.js';
 
 const transporter = nodemailer.createTransport({
-    service: 'gmail',
+    service: 'gmail', 
     auth: {
         user: process.env.SMTP_USERNAME,
         pass: process.env.SMTP_PASSWORD
@@ -258,6 +258,65 @@ export const sendAppointmentReminder = async (appointment) => {
         return { success: true };
     } catch (error) {
         console.error('Reminder email sending failed:', error);
+        return { success: false, error: error.message };
+    }
+};
+
+export const sendForgotPasswordEmail = async (email, newPassword) => {
+    try {
+        console.log('📧 Sending new password email to:', email);
+        
+        await transporter.sendMail({
+            from: process.env.SMTP_USERNAME,
+            to: email,
+            subject: "Mật khẩu mới - Prescripto",
+            html: `
+                <div style="max-width: 600px; margin: 0 auto; padding: 30px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1); background-color: #ffffff; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #333333;">
+                    <div style="text-align: center; margin-bottom: 25px;">
+                        <h2 style="color: #2196F3; margin: 0; font-size: 24px; font-weight: 600;">🔐 Mật khẩu mới</h2>
+                        <p style="color: #666; margin-top: 8px; font-size: 14px;">Mật khẩu mới cho tài khoản Prescripto của bạn</p>
+                    </div>
+                    
+                    <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #2196F3;">
+                        <p style="margin: 0; color: #555; font-size: 15px; line-height: 1.6;">
+                            Chúng tôi nhận được yêu cầu đặt lại mật khẩu cho tài khoản của bạn. 
+                            Dưới đây là mật khẩu mới để đăng nhập.
+                        </p>
+                    </div>
+                    
+                    <div style="background-color: #e3f2fd; padding: 20px; border-radius: 8px; margin: 20px 0; border: 2px solid #2196F3;">
+                        <p style="margin: 0; text-align: center; font-size: 18px; font-weight: 600; color: #1976d2;">
+                            Mật khẩu mới của bạn:
+                        </p>
+                        <p style="margin: 10px 0; text-align: center; font-size: 24px; font-weight: bold; color: #2196F3; letter-spacing: 2px; background-color: #ffffff; padding: 15px; border-radius: 6px; border: 1px solid #2196F3;">
+                            ${newPassword}
+                        </p>
+                    </div>
+                    
+                    <div style="background-color: #fff3cd; padding: 15px; border-radius: 8px; border: 1px solid #ffeaa7; margin-bottom: 20px;">
+                        <p style="margin: 0; color: #856404; font-size: 14px;">
+                            <strong>Lưu ý quan trọng:</strong>
+                        </p>
+                        <ul style="margin: 10px 0; padding-left: 20px; color: #856404; font-size: 14px;">
+                            <li>Vui lòng đăng nhập ngay với mật khẩu mới này</li>
+                            <li>Sau khi đăng nhập, bạn nên thay đổi mật khẩu trong phần cài đặt tài khoản</li>
+                            <li>Không chia sẻ mật khẩu này với người khác</li>
+                            <li>Mật khẩu này chỉ có hiệu lực một lần</li>
+                        </ul>
+                    </div>
+                    
+                    <div style="border-top: 1px solid #e0e0e0; padding-top: 20px; text-align: center; font-size: 14px; color: #666666;">
+                        <p style="margin: 0;">Nếu bạn không thực hiện yêu cầu này, vui lòng liên hệ hỗ trợ ngay lập tức.</p>
+                        <p style="margin: 10px 0;">Cảm ơn bạn đã sử dụng Prescripto!</p>
+                    </div>
+                </div>
+            `
+        });
+
+        console.log('✅ New password email sent successfully to:', email);
+        return { success: true };
+    } catch (error) {
+        console.error('❌ New password email sending failed:', error);
         return { success: false, error: error.message };
     }
 };

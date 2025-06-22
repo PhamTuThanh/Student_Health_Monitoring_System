@@ -1,3 +1,10 @@
+Kill port: npx kill-port 5174
+-------fix error tunnel long time----------
+npm uninstall -g ngrok
+npm install -g ngrok
+
+netstat -a -n -o | findstr :9000
+
 # React + Vite
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.

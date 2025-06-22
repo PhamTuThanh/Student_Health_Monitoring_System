@@ -1,6 +1,7 @@
 import { createContext, useState, useEffect, useContext } from "react";
 import { useAppContext } from "./AppContext";
 import io from "socket.io-client";
+import { toast } from "react-hot-toast";
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL ;
 const SocketContext = createContext();	
@@ -16,59 +17,34 @@ export const SocketContextProvider = ({ children }) => {
 
 	useEffect(() => {
 		if (userData && userData._id) {
-			console.log("Connecting socket with userData:", userData);
-			console.log("Connecting to backend URL:", BACKEND_URL);
-
 			const socket = io(BACKEND_URL, {
-			//	transports: ['websocket', "polling"],
-				query: {
-					userId: userData._id,
-				},
-				reconnection: true,
-				reconnectionAttempts: 5,
-				reconnectionDelay: 1000,
-				timeout: 10000,
-				forceNew: true
+				withCredentials: true
 			});
-
 			socket.on("connect", () => {
-				console.log("Socket connected successfully");
-				console.log("Socket ID:", socket.id);
+				console.log("Socket connected successfully:", socket.id);
 			});
 
-			socket.on("connect_error", (error) => {
+			socket.on("connect_error", (error) => {	
 				console.error("Socket connection error:", error.message);
-				console.error("Error details:", error);
-			});
-
-			socket.on("error", (err) => {
-				console.error("Socket error:", err);
 			});
 
 			setSocket(socket);
 
+			socket.on("auth_error", (error) => {
+				console.error("Socket authentication error:", error.message);
+				toast.error(`Socket Auth Error: ${error.message}`);
+			});
+
 			socket.on("getOnlineUsers", (users) => {
-				console.log("Online users:", users);
 				setOnlineUsers(users);
-			});
-
-			socket.on("newMessage", (message) => {
-				console.log("New message received:", message);
-			});
-
-			socket.on("disconnect", (reason) => {
-				console.log("Socket disconnected. Reason:", reason);
 			});
 
 			return () => {
 				console.log("Closing socket connection");
-				if (socket.connected) {
-					socket.disconnect();
-				}
+				socket.disconnect();
 				setSocket(null);
 			};
 		} else {
-			console.log("No userData, skipping socket connection");
 			if (socket) {
 				socket.disconnect();
 				setSocket(null);

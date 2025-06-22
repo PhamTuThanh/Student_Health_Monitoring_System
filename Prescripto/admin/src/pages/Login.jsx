@@ -20,30 +20,24 @@ const Login = () => {
     setIsLoading(true)
     
     try {
-      // Note: Replace with your actual axios implementation
       if (state === 'Admin') {
         const { data } = await axios.post(backendUrl + '/api/admin/login', { email, password })
         if (data.success) {
-          localStorage.setItem('aToken', data.token)
-          setAToken(data.token)
+          setAToken(true)
+          toast.success('Admin login successful!')
           window.location.reload()
         } else {
           toast.error(data.message)
         }
-        console.log('Admin login attempt:', { email, password })
-        toast.success('Admin login simulation - replace with actual API call')
       } else {
         const { data } = await axios.post(backendUrl + '/api/doctor/login', { email, password })
         if (data.success) {
-          localStorage.setItem('dToken', data.token)
-          setDToken(data.token)
-          console.log(data.token)
+          setDToken(true)
+          toast.success('Doctor login successful!')
           window.location.reload()
         } else {
           toast.error(data.message)
         }
-        console.log('Doctor login attempt:', { email, password })
-        toast.success('Doctor login simulation - replace with actual API call')
       }
     } catch (error) {
       toast.error(error.message)

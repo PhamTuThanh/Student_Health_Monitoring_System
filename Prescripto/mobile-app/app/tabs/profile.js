@@ -5,7 +5,8 @@ import {
   Text,
   TouchableOpacity,
   Image,
-  ScrollView
+  ScrollView,
+  Alert
 } from "react-native";
 import { useDispatch, useSelector } from "react-redux";
 import { useRouter } from "expo-router";
@@ -13,20 +14,26 @@ import { logoutAction } from "../redux/authSlice";
 import ProtectedRoute from "../../components/ProtectedRoute";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
+import { useMutation } from "@tanstack/react-query";
+import { changePassword } from "../services/api/api";
 
 export default function Profile() {
   const router = useRouter();
   const dispatch = useDispatch();
   const user = useSelector((state) => state.auth.user);
-
+  const mutation = useMutation({
+    mutationFn: changePassword,
+    onSuccess: () => {
+      Alert.alert("Thành công", "Mật khẩu đã được thay đổi");
+    },
+    onError: () => {
+      Alert.alert("Lỗi", "Mật khẩu đã được thay đổi");
+    }
+  });
   const handleLogout = () => {
     dispatch(logoutAction());
     AsyncStorage.removeItem("token");
     router.push("/auth/login");
-  };
-
-  const handleChangePassword = () => {
-
   };
 
   return (
@@ -49,7 +56,7 @@ export default function Profile() {
           <Text style={styles.label}>KHÓA: <Text style={styles.value}>{user?.cohort}</Text></Text>
           <Text style={styles.label}>MSSV: <Text style={styles.value}>{user?.studentId}</Text></Text>
 
-          <TouchableOpacity style={styles.changePassword} onPress={handleChangePassword}>
+          <TouchableOpacity style={styles.changePassword} onPress={() => router.push("/auth/changePassword")} disabled={mutation.isPending}>
             <Text style={styles.changePasswordText}>Đổi mật khẩu</Text>
           </TouchableOpacity>
         </View>
