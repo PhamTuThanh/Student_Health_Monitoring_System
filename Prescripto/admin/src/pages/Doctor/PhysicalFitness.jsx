@@ -425,7 +425,7 @@ export default function PhysicalFitness() {
     return (
       <div className="fixed inset-0 z-50 flex flex-col justify-center items-center bg-white bg-opacity-70">
         <div className="w-16 h-16 border-4 border-blue-400 border-t-transparent rounded-full animate-spin mb-4"></div>
-        <div className="text-lg text-blue-600 font-semibold animate-pulse">Đang tải dữ liệu...</div>
+        <div className="text-lg text-blue-600 font-semibold animate-pulse">Loading...</div>
       </div>
     );
   }

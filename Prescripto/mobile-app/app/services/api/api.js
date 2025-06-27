@@ -198,7 +198,7 @@ const getAbnormality = async (studentId) => {
     if (!token) {
         throw new Error("No authentication token found");
     }
-    const response = await axios.get(`${BACKEND_URL}/api/doctor/abnormality/${studentId}`, {
+    const response = await axios.get(`${BACKEND_URL}/api/user/get-abnormality/${studentId}`, {
         headers: { "Authorization": `Bearer ${token}` }
     });
     return response.data;
@@ -208,7 +208,7 @@ const getPrescription = async (studentId) => {
     if (!token) {
         throw new Error("No authentication token found");
     }
-    const response = await axios.get(`${BACKEND_URL}/api/doctor/get-prescription/${studentId}`, {
+    const response = await axios.get(`${BACKEND_URL}/api/user/get-prescription/${studentId}`, {
         headers: { "Authorization": `Bearer ${token}` }
     });
     return response.data;

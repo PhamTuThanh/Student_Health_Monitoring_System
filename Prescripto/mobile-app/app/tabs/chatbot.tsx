@@ -18,7 +18,6 @@ import { getChatbot, getDataPhysical, saveChatHistory, getChatHistory } from "..
 import { useSelector } from "react-redux";
 import Markdown from "react-native-markdown-display";
 
-// Type definitions
 interface Message {
   id: string;
   sender: "user" | "bot";
@@ -46,14 +45,7 @@ interface RootState {
 const { width: screenWidth } = Dimensions.get("window");
 
 const Chatbot: React.FC = () => {
-  // const [messages, setMessages] = useState<Message[]>([
-  //   {
-  //     id: "1",
-  //     sender: "bot",
-  //     content: "Xin chào! Tôi là trợ lý sức khỏe AI của bạn. Tôi có thể giúp gì cho bạn hôm nay? 🏥✨",
-  //     timestamp: new Date(),
-  //   },
-  // ]);
+  
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
@@ -89,9 +81,9 @@ const Chatbot: React.FC = () => {
       const updatedMessages = [...messages, userMessage, botMessage];
       setMessages(updatedMessages);
 
-      // Lưu lịch sử chat
+      
       if (user?.studentId) {
-        console.log("User object:", user); // Debug log
+        console.log("User object:", user); 
         if (!user.studentName) {
           console.error("studentName is missing in user object");
           return;
@@ -104,7 +96,7 @@ const Chatbot: React.FC = () => {
           });
         } catch (error) {
           console.error("Error saving chat history:", error);
-          // Thêm thông báo lỗi cho người dùng nếu cần
+          
         }
       }
     } catch (err) {
@@ -166,11 +158,11 @@ const Chatbot: React.FC = () => {
         timestamp: new Date(),
       };
 
-      // Cập nhật messages và lưu vào lịch sử
+      
       const updatedMessages = [...messages, userMessage, botMessage];
       setMessages(updatedMessages);
 
-      // Lưu lịch sử chat
+      
       if (user?.studentId && user?.studentName) {
         try {
           await saveChatHistory({
@@ -218,7 +210,7 @@ const Chatbot: React.FC = () => {
           setMessages(messagesWithId);
           return;
         }
-        // Nếu không có lịch sử, set tin nhắn chào mừng mặc định
+        
         const welcomeMessage: Message = {
           id: `welcome-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
           sender: "bot",
@@ -227,7 +219,7 @@ const Chatbot: React.FC = () => {
         };
         setMessages([welcomeMessage]);
       } catch (error: unknown) {
-        // Nếu lỗi là 404 hoặc "No chat history found" thì cũng set tin nhắn mặc định
+        
         if (
           error && 
           typeof error === 'object' && 
@@ -351,7 +343,7 @@ const Chatbot: React.FC = () => {
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
       >
-        {/* Modern Header */}
+        
         <View style={styles.header}>
           <View style={styles.headerGradient}>
             <View style={styles.headerContent}>
@@ -361,7 +353,7 @@ const Chatbot: React.FC = () => {
                 </View>
                 <View>
                   <Text style={styles.headerTitle}>Health AI Assistant</Text>
-                  {/* <Text style={styles.headerSubtitle}>Trợ lý sức khỏe thông minh</Text> */}
+
                 </View>
               </View>
               
@@ -375,7 +367,6 @@ const Chatbot: React.FC = () => {
           </View>
         </View>
 
-        {/* Messages List with improved styling */}
         <FlatList
           ref={flatListRef}
           data={messages}
@@ -388,7 +379,6 @@ const Chatbot: React.FC = () => {
           extraData={messages}
         />
 
-        {/* Modern Input Container */}
         <View style={styles.inputContainer}>
           <View style={styles.inputInnerContainer}>
             <View style={[styles.inputWrapper, { minHeight: inputHeight }]}>
@@ -436,7 +426,7 @@ const Chatbot: React.FC = () => {
               </TouchableOpacity>
             </View>
             
-            {/* Character counter */}
+                
             
           </View>
         </View>

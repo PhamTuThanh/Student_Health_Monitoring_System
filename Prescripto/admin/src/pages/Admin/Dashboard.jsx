@@ -110,11 +110,11 @@ const Dashboard = () => {
             </svg>
           </div>
           <div>
-            <h1 className='text-3xl font-semibold text-gray-900 ml-[150px]'>
-              Chào Mừng Trở Lại!
+            <h1 className='text-3xl font-semibold text-gray-900 '>
+              Welcome to UTC2 Health Dashboard
             </h1>
-            <p className='text-gray-600 mt-2'>
-              Xin chào! Chúng tôi rất vui khi bạn quay trở lại với hệ thống quản lý của chúng tôi.
+            <p className='text-gray-600 mt-2 ml-10'>
+              Hello! We are very happy to have you back with our system.
             </p>
           </div>
         </div>
@@ -130,7 +130,7 @@ const Dashboard = () => {
               </svg>
             </div>
             <div className='ml-4'>
-              <p className='text-sm font-medium text-gray-600'>Tổng Bác Sĩ</p>
+              <p className='text-sm font-medium text-gray-600'>Total Doctors</p>
               <p className='text-2xl font-semibold text-gray-900'>{dashData?.doctors || 0}</p>
             </div>
           </div>
@@ -144,7 +144,7 @@ const Dashboard = () => {
               </svg>
             </div>
             <div className='ml-4'>
-              <p className='text-sm font-medium text-gray-600'>Sinh Viên</p>
+              <p className='text-sm font-medium text-gray-600'>Students</p>
               <p className='text-2xl font-semibold text-gray-900'>{dashData?.students || 0}</p>
             </div>
           </div>
@@ -158,7 +158,7 @@ const Dashboard = () => {
               </svg>
             </div>
             <div className='ml-4'>
-              <p className='text-sm font-medium text-gray-600'>Tin Tức</p>
+              <p className='text-sm font-medium text-gray-600'>News</p>
               <p className='text-2xl font-semibold text-gray-900'>{newsData?.length || 0}</p>
             </div>
           </div>
@@ -172,7 +172,7 @@ const Dashboard = () => {
               </svg>
             </div>
             <div className='ml-4'>
-              <p className='text-sm font-medium text-gray-600'>Lịch Khám Định Kỳ</p>
+              <p className='text-sm font-medium text-gray-600'>Exam Sessions</p>
               <p className='text-2xl font-semibold text-gray-900'>{examSessions?.length || 0}</p>
             </div>
           </div>
@@ -182,7 +182,7 @@ const Dashboard = () => {
       {/* Recent Activity */}
       <div className='grid grid-cols-1 lg:grid-cols-2 gap-6'>
         <div className='bg-white rounded-lg shadow-sm border border-gray-200 p-6'>
-          <h3 className='text-lg font-semibold text-gray-900 mb-4'>Hoạt Động Gần Đây</h3>
+          <h3 className='text-lg font-semibold text-gray-900 mb-4'>Recent Activity</h3>
           <div className='space-y-4'>
             {getRecentActivity().length > 0 ? (
               getRecentActivity().map((activity, index) => (
@@ -210,13 +210,13 @@ const Dashboard = () => {
                 </div>
               ))
             ) : (
-              <p className='text-sm text-gray-500'>Chưa có thông báo gần đây</p>
+              <p className='text-sm text-gray-500'>No recent news</p>
             )}
           </div>
         </div>
 
         <div className='bg-white rounded-lg shadow-sm border border-gray-200 p-6'>
-          <h3 className='text-lg font-semibold text-gray-900 mb-4'>Lịch Khám Sắp Tới</h3>
+            <h3 className='text-lg font-semibold text-gray-900 mb-4'>Upcoming Events</h3>
           <div className='space-y-4'>
             {getUpcomingEvents().length > 0 ? (
               getUpcomingEvents().map((event, index) => (

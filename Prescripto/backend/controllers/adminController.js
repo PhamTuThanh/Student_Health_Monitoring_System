@@ -103,13 +103,13 @@ const addStudent = async (req, res) => {
             const imageUpload = await cloudinary.uploader.upload(imageFile.path, {resource_type: "image" });
             imageUrl = imageUpload.secure_url;
         }        
-
+        //phone default 0000000000
         const studentData = {
             name,
             email,
             image: imageUrl,
             password: hashedPassword,
-            phone,
+            phone: phone || '0000000000',
             cohort,
             studentId,
             major,

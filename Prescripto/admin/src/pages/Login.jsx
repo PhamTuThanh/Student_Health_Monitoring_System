@@ -2,7 +2,9 @@ import React, { useContext, useState } from 'react'
 import { AdminContext } from '../context/AdminContext'
 import { toast } from 'react-toastify'
 import { DoctorContext } from '../context/DoctorContext'
+import { useAppContext } from '../context/AppContext'
 import { User, Lock, Mail, Eye, EyeOff } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import axios from 'axios'
 
 const Login = () => {
@@ -11,9 +13,11 @@ const Login = () => {
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const navigate = useNavigate()
 
   const { setAToken, backendUrl } = useContext(AdminContext)
   const { setDToken } = useContext(DoctorContext)
+  const { fetchUserData } = useAppContext()
 
   const onSubmitHandler = async (event) => {
     event.preventDefault()
@@ -25,7 +29,7 @@ const Login = () => {
         if (data.success) {
           setAToken(true)
           toast.success('Admin login successful!')
-          window.location.reload()
+          navigate('/admin-dashboard')
         } else {
           toast.error(data.message)
         }
@@ -33,8 +37,12 @@ const Login = () => {
         const { data } = await axios.post(backendUrl + '/api/doctor/login', { email, password })
         if (data.success) {
           setDToken(true)
+          // Fetch userData after login for socket connection
+          setTimeout(() => {
+            fetchUserData()
+          }, 1000)
           toast.success('Doctor login successful!')
-          window.location.reload()
+          navigate('/doctor-dashboard')
         } else {
           toast.error(data.message)
         }

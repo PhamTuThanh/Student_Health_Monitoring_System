@@ -17,7 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { getInfoUser, getPhysicalData, getAbnormality, getHealthScores } from '../services/api/api';
 import { useNavigation } from '@react-navigation/native';
 
-const { width } = Dimensions.get('window'); // Kept, but not directly used in styles below
+const { width } = Dimensions.get('window'); 
 
 interface StudentData {
   name: string;
@@ -60,7 +60,7 @@ interface AbnormalityRecord {
 
 const StudentHealthDashboard: React.FC = () => {
   const navigation = useNavigation();
-  const [activeTab, setActiveTab] = useState<string>('overview'); // This state is not used in the current render logic, but kept for future use
+  const [activeTab, setActiveTab] = useState<string>('overview'); 
   const [studentData, setStudentData] = useState<StudentData | null>(null);
   const [healthMetrics, setHealthMetrics] = useState<HealthMetrics | null>(null);
   const [abnormalityHistory, setAbnormalityHistory] = useState<AbnormalityRecord[]>([]);
@@ -115,11 +115,10 @@ const StudentHealthDashboard: React.FC = () => {
   }, [loading]);
 
   useEffect(() => {
-    let isMounted = true; // Prevent state updates if component unmounts
+    let isMounted = true; 
     
     const fetchAll = async () => {
       try {
-        // Fetch user info first
         const user = await getInfoUser();
         if (!isMounted) return;
         
@@ -129,37 +128,52 @@ const StudentHealthDashboard: React.FC = () => {
         
         setStudentData(user.userData);
         
-        // Only proceed if we have studentId
         if (!user.userData.studentId) {
           throw new Error('Student ID not found');
         }
   
-        // Fetch physical data
         try {
           const physical = await getPhysicalData(user.userData.studentId);
           if (!isMounted) return;
           
-          const latestPhysical = Array.isArray(physical?.data) && physical.data.length > 0
-            ? physical.data[physical.data.length - 1]
-            : null;
+          
+          let latestPhysical = null;
+          if (physical?.success && physical?.data) {
+            if (Array.isArray(physical.data) && physical.data.length > 0) {
+              // get the latest record with all information
+              const validRecords = physical.data.filter((record: any) => 
+                record && 
+                record.height && 
+                record.weight && 
+                record.bmi
+              );
+              if (validRecords.length > 0) {
+                latestPhysical = validRecords[validRecords.length - 1];
+              }
+            }
+          }
+          
           setHealthMetrics(latestPhysical);
+         
         } catch (physicalError) {
           console.warn('Failed to fetch physical data:', physicalError);
           setHealthMetrics(null);
         }
   
-        // Fetch abnormal data
         try {
           const abnormal = await getAbnormality(user.userData.studentId);
           if (!isMounted) return;
           
+        
+          
           setAbnormalityHistory(Array.isArray(abnormal?.data) ? abnormal.data : []);
+          
+          console.log('AbnormalityHistory set to:', Array.isArray(abnormal?.data) ? abnormal.data : []);
         } catch (abnormalError) {
           console.warn('Failed to fetch abnormal data:', abnormalError);
           setAbnormalityHistory([]);
         }
   
-        // Fetch health scores
         try {
           const scores = await getHealthScores(user.userData.studentId);
           if (!isMounted) return;
@@ -169,7 +183,6 @@ const StudentHealthDashboard: React.FC = () => {
           }
         } catch (scoresError) {
           console.warn('Failed to fetch health scores:', scoresError);
-          // Keep default scores if fetch fails
         }
   
       } catch (err) {
@@ -192,8 +205,7 @@ const StudentHealthDashboard: React.FC = () => {
     };
   
     fetchAll();
-  
-    // Cleanup function
+    
     return () => {
       isMounted = false;
     };
@@ -238,7 +250,7 @@ const StudentHealthDashboard: React.FC = () => {
   };
 
   const renderHealthMetricCard = (
-    icon: keyof typeof Ionicons.glyphMap, // Use keyof typeof to ensure valid icon names
+    icon: keyof typeof Ionicons.glyphMap, 
     title: string,
     value: string,
     subtitle: string,
@@ -258,7 +270,7 @@ const StudentHealthDashboard: React.FC = () => {
           <Ionicons
             name={trend.direction === 'up' ? 'trending-up' : 'trending-down'}
             size={12}
-            color={trend.direction === 'up' ? '#10B981' : '#EF4444'} // Green for up, Red for down
+            color={trend.direction === 'up' ? '#10B981' : '#EF4444'} 
           />
           <Text style={styles.trendText}>{trend.text}</Text>
         </View>
@@ -291,6 +303,12 @@ const StudentHealthDashboard: React.FC = () => {
     inputRange: [0, 1],
     outputRange: ['0deg', '360deg'],
   });
+
+  // Cải thiện logic kiểm tra healthMetrics
+  const hasValidHealthMetrics = healthMetrics && 
+    healthMetrics.height && 
+    healthMetrics.weight && 
+    healthMetrics.bmi;
 
   if (loading) {
     return (
@@ -325,15 +343,13 @@ const StudentHealthDashboard: React.FC = () => {
     );
   }
 
-  // Trường hợp học sinh mới chưa có dữ liệu sức khỏe
-  if (!healthMetrics) {
+  if (!hasValidHealthMetrics) {
     return (
       <SafeAreaView style={styles.container}>
         <LinearGradient
           colors={['#EFF6FF', '#FFFFFF', '#F0FDF4']}
           style={styles.gradient}
         >
-          {/* Header */}
           <View style={styles.header}>
             <View style={styles.headerLeft}>
               <View style={styles.logoContainer}>
@@ -465,7 +481,9 @@ const StudentHealthDashboard: React.FC = () => {
               
               <View style={styles.infoCard}>
                 <Ionicons name="analytics-outline" size={32} color="#3B82F6" />
-                <Text style={styles.infoCardTitle}>Analy
+                <Text style={styles.infoCardTitle}>Track Progress</Text>
+                <Text style={styles.infoCardDescription}>
+                  Monitor your health trends and improvements over time
                 </Text>
               </View>
             </View>
@@ -479,15 +497,15 @@ const StudentHealthDashboard: React.FC = () => {
               <View style={styles.contactDetails}>
                 <View style={styles.contactRow}>
                   <Ionicons name="location-outline" size={16} color="#6B7280" />
-                  <Text style={styles.contactText}>UTC2 Health Center</Text>
+                  <Text style={styles.contactText}>UTC2 Health Department</Text>
                 </View>
                 <View style={styles.contactRow}>
                   <Ionicons name="call-outline" size={16} color="#6B7280" />
-                  <Text style={styles.contactText}>0123-456-789</Text>
+                  <Text style={styles.contactText}>(028).3736.0564</Text>
                 </View>
                 <View style={styles.contactRow}>
                   <Ionicons name="time-outline" size={16} color="#6B7280" />
-                  <Text style={styles.contactText}>Monday - Friday: 8:00 - 17:00</Text>
+                  <Text style={styles.contactText}>Monday - Friday: 7:00 - 17:30</Text>
                 </View>
               </View>
             </View>
@@ -620,7 +638,7 @@ const StudentHealthDashboard: React.FC = () => {
               getBMIStatus(healthMetrics?.bmi || '0').color
             )}
             {renderHealthMetricCard(
-              'heart-outline', // Valid Ionicons name
+              'heart-outline', 
               'Heart Rate',
               `${healthMetrics?.heartRate} bpm`,
               'Normal',
@@ -639,7 +657,6 @@ const StudentHealthDashboard: React.FC = () => {
                 {healthScores.overall}%
               </Text>
             </View>
-            {/* Removed "space: 16" and replaced with marginVertical where needed */}
             <View style={styles.healthScoresContainer}>
               {Object.entries(healthScores)
                 .filter(([key]) => key !== 'overall')
@@ -700,7 +717,7 @@ const StudentHealthDashboard: React.FC = () => {
             <Text style={styles.lastCheckupText}>
               Last checkup: {healthMetrics?.followDate}
             </Text>
-            {/* Removed "space: 16" and replaced with marginBottom where needed */}
+           
             <View style={styles.historyContainer}>
               {abnormalityHistory.map((record) => (
                 <View key={record._id} style={styles.historyRecord}>
@@ -767,15 +784,11 @@ const styles = StyleSheet.create({
     borderTopColor: 'transparent',
     borderRadius: 32,
     marginBottom: 16,
-    // Note: React Native doesn't have built-in CSS animations
-    // You would need to use Animated API or libraries like react-native-reanimated
-    // For now, this creates the visual structure
   },
   loadingText: {
     fontSize: 18,
     color: '#2563EB',
     fontWeight: '600',
-    // Note: For pulse animation, you'd need to implement with Animated API
   },
   gradient: {
     flex: 1,
@@ -899,14 +912,13 @@ const styles = StyleSheet.create({
   studentDetails: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    // Removed 'space: 16' - handled by marginRight and marginBottom in detailRow
   },
   detailRow: {
     flexDirection: 'row',
     alignItems: 'center',
     marginRight: 16,
     marginBottom: 4,
-    width: '45%', // To allow two items per row approximately
+    width: '45%', 
   },
   detailText: {
     fontSize: 12,
@@ -938,7 +950,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     borderRadius: 16,
     padding: 16,
-    width: '48%', // For two cards per row
+    width: '48%', 
     marginBottom: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -963,7 +975,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#6B7280',
     flex: 1,
-    textAlign: 'right', // Aligns the title to the right within its flex container
+    textAlign: 'right', 
   },
   metricValue: {
     fontSize: 20,
@@ -981,7 +993,6 @@ const styles = StyleSheet.create({
   },
   trendText: {
     fontSize: 12,
-    // color: '#10B981', // Color now depends on trend direction
     marginLeft: 4,
   },
   card: {
@@ -1016,19 +1027,17 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   healthScoresContainer: {
-    // Removed 'space: 16'
-    // Margins are now handled by marginBottom in scoreRow
   },
   scoreRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16, // Added marginBottom for spacing
+    marginBottom: 16, 
   },
   scoreLabel: {
     fontSize: 14,
     color: '#6B7280',
-    flex: 1,
+    flex: 1,  
   },
   progressBarContainer: {
     flexDirection: 'row',
@@ -1059,14 +1068,12 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   appointmentsContainer: {
-    // Removed 'space: 16'
-    // Margins are now handled by marginBottom in appointmentCard
   },
   appointmentCard: {
     backgroundColor: '#F9FAFB',
     borderRadius: 12,
     padding: 16,
-    marginBottom: 16, // Added marginBottom for spacing
+      marginBottom: 16, 
   },
   appointmentHeader: {
     flexDirection: 'row',
@@ -1084,13 +1091,11 @@ const styles = StyleSheet.create({
     color: '#6B7280',
   },
   appointmentDetails: {
-    // Removed 'space: 4'
-    // Margins are now handled by marginBottom in appointmentDetail
   },
   appointmentDetail: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 4, // Added marginBottom for spacing
+    marginBottom: 4, 
   },
   appointmentDetailText: {
     fontSize: 12,
@@ -1117,15 +1122,13 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
   historyContainer: {
-    // Removed 'space: 16'
-    // Margins are now handled by marginBottom in historyRecord
   },
   historyRecord: {
     borderWidth: 1,
     borderColor: '#E5E7EB',
     borderRadius: 12,
     padding: 16,
-    marginBottom: 16, // Added marginBottom for spacing
+    marginBottom: 16, 
   },
   historyHeader: {
     flexDirection: 'row',
@@ -1183,7 +1186,7 @@ const styles = StyleSheet.create({
     color: '#065F46',
   },
   historyContent: {
-    marginLeft: 52, // Indent to align with the text in historyLeft
+    marginLeft: 52, 
   },
   symptomsContainer: {
     marginBottom: 8,
@@ -1217,7 +1220,7 @@ const styles = StyleSheet.create({
   treatmentText: {
     fontSize: 12,
     color: '#6B7280',
-    flex: 1, // Allow text to wrap within the available space
+    flex: 1, 
   },
   welcomeCard: {
     backgroundColor: 'white',

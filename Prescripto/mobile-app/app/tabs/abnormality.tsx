@@ -67,7 +67,7 @@ const Abnormality = () => {
   
   const userInfo = useSelector((state: any) => state.auth.userInfo);
 
-  // Fetch user info để lấy studentId
+  // Fetch user info to get studentId
   useEffect(() => {
     const fetchUserInfo = async () => {
       try {
@@ -91,6 +91,9 @@ const Abnormality = () => {
       return;
     }
 
+    console.log('=== FETCHING DATA ===');
+    console.log('Using studentId:', studentId);
+
     try {
       const [abnormalityResponse, prescriptionResponse] = await Promise.all([
         getAbnormality(studentId),
@@ -101,14 +104,44 @@ const Abnormality = () => {
       console.log('Prescription API response:', prescriptionResponse);
       
       if (abnormalityResponse && abnormalityResponse.success && abnormalityResponse.data) {
-        setAbnormalities(abnormalityResponse.data);
+        // Nếu data là object đơn lẻ, wrap vào array
+        const isArray = Array.isArray(abnormalityResponse.data);
+        console.log('Raw abnormality data:', abnormalityResponse.data);
+        console.log('Is abnormality data array?', isArray);
+        console.log('Original data length:', isArray ? abnormalityResponse.data.length : 'N/A (not array)');
+        
+        const abnormalityData = isArray 
+          ? abnormalityResponse.data 
+          : [abnormalityResponse.data];
+        console.log(`Abnormality data type: ${isArray ? 'Array' : 'Object'}, count: ${abnormalityData.length}`);
+        console.log('Final abnormality data to be set:', abnormalityData);
+        console.log('Each abnormality item:', abnormalityData.map((item: AbnormalityItem, index: number) => ({
+          index,
+          id: item._id,
+          studentName: item.studentName,
+          doctorName: item.doctorName
+        })));
+        setAbnormalities(abnormalityData);
       } else {
+        console.log('No abnormality data, setting empty array');
         setAbnormalities([]);
       }
 
       if (prescriptionResponse && prescriptionResponse.success && prescriptionResponse.data) {
-        setPrescriptions(prescriptionResponse.data);
+        // Nếu data là object đơn lẻ, wrap vào array
+        const isArray = Array.isArray(prescriptionResponse.data);
+        console.log('Raw prescription data:', prescriptionResponse.data);
+        console.log('Is prescription data array?', isArray);
+        console.log('Original prescription data length:', isArray ? prescriptionResponse.data.length : 'N/A (not array)');
+        
+        const prescriptionData = isArray 
+          ? prescriptionResponse.data 
+          : [prescriptionResponse.data];
+        console.log(`Prescription data type: ${isArray ? 'Array' : 'Object'}, count: ${prescriptionData.length}`);
+        console.log('Final prescription data to be set:', prescriptionData);
+        setPrescriptions(prescriptionData);
       } else {
+        console.log('No prescription data, setting empty array');
         setPrescriptions([]);
       }
     } catch (error) {
@@ -127,6 +160,7 @@ const Abnormality = () => {
       fetchAbnormalities();
     }
   }, [studentId]);
+
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -378,35 +412,45 @@ const Abnormality = () => {
         }
         showsVerticalScrollIndicator={false}
       >
-        {activeTab === 'abnormality' ? (
-          abnormalities.length > 0 ? (
-            <View style={styles.contentContainer}>
-              {abnormalities.map(renderAbnormalityItem)}
-            </View>
+        {(() => {
+          console.log('Current render state:', {
+            activeTab,
+            abnormalitiesLength: abnormalities.length,
+            prescriptionsLength: prescriptions.length,
+            abnormalities: abnormalities,
+            prescriptions: prescriptions
+          });
+          
+          return activeTab === 'abnormality' ? (
+            abnormalities.length > 0 ? (
+              <View style={styles.contentContainer}>
+                {abnormalities.map(renderAbnormalityItem)}
+              </View>
+            ) : (
+              <View style={styles.emptyContainer}>
+                <Ionicons name="checkmark-circle" size={64} color="#10b981" />
+                <Text style={styles.emptyTitle}>Great!</Text>
+                <Text style={styles.emptyText}>
+                  Currently no abnormalities detected
+                </Text>
+              </View>
+            )
           ) : (
-            <View style={styles.emptyContainer}>
-              <Ionicons name="checkmark-circle" size={64} color="#10b981" />
-              <Text style={styles.emptyTitle}>Great!</Text>
-              <Text style={styles.emptyText}>
-                Currently no abnormalities detected
-              </Text>
-            </View>
-          )
-        ) : (
-          prescriptions.length > 0 ? (
-            <View style={styles.contentContainer}>
-              {prescriptions.map(renderPrescriptionItem)}
-            </View>
-          ) : (
-            <View style={styles.emptyContainer}>
-              <Ionicons name="medical-outline" size={64} color="#9ca3af" />
-              <Text style={styles.emptyTitle}>No Prescriptions</Text>
-              <Text style={styles.emptyText}>
-                You don't have any prescriptions yet
-              </Text>
-            </View>
-          )
-        )}
+            prescriptions.length > 0 ? (
+              <View style={styles.contentContainer}>
+                {prescriptions.map(renderPrescriptionItem)}
+              </View>
+            ) : (
+              <View style={styles.emptyContainer}>
+                <Ionicons name="medical-outline" size={64} color="#9ca3af" />
+                <Text style={styles.emptyTitle}>No Prescriptions</Text>
+                <Text style={styles.emptyText}>
+                  You don't have any prescriptions yet
+                </Text>
+              </View>
+            )
+          );
+        })()}
       </ScrollView>
     </View>
   );
@@ -442,6 +486,7 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   headerText: {
+    paddingTop: 20,
     flex: 1,
   },
   title: {

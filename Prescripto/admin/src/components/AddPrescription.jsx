@@ -123,20 +123,20 @@ const AddPrescription = ({ selectedAbnormality, onClose }) => {
     };
 
     const frequencyOptions = [
-        { value: "1x/day", label: "1 lần/ngày" },
-        { value: "2x/day", label: "2 lần/ngày" },
-        { value: "3x/day", label: "3 lần/ngày" },
-        { value: "4x/day", label: "4 lần/ngày" },
-        { value: "as-needed", label: "Khi cần thiết" }
+        { value: "1x/day", label: "1 time/day" },
+        { value: "2x/day", label: "2 times/day" },
+        { value: "3x/day", label: "3 times/day" },
+        { value: "4x/day", label: "4 times/day" },
+        { value: "as-needed", label: "As needed" }
     ];
 
     const durationOptions = [
-        { value: "3-days", label: "3 ngày" },
-        { value: "5-days", label: "5 ngày" },
-        { value: "7-days", label: "1 tuần" },
-        { value: "10-days", label: "10 ngày" },
-        { value: "14-days", label: "2 tuần" },
-        { value: "30-days", label: "1 tháng" }
+        { value: "3-days", label: "3 days" },
+        { value: "5-days", label: "5 days" },
+        { value: "7-days", label: "1 week" },
+        { value: "10-days", label: "10 days" },
+        { value: "14-days", label: "2 weeks" },
+        { value: "30-days", label: "1 month" }
     ];
 
     return (
@@ -353,10 +353,10 @@ const AddPrescription = ({ selectedAbnormality, onClose }) => {
                                                     value={medicine.beforeAfterMeal}
                                                     onChange={(e) => updateMedicine(medicine.id, 'beforeAfterMeal', e.target.value)}
                                                 >
-                                                    <option value="before">Trước ăn</option>
-                                                    <option value="after">Sau ăn</option>
-                                                    <option value="with">Cùng lúc ăn</option>
-                                                    <option value="anytime">Bất kỳ lúc nào</option>
+                                                    <option value="before">Before meal</option>
+                                                    <option value="after">After meal</option>
+                                                    <option value="with">With meal</option>
+                                                    <option value="anytime">Anytime</option>
                                                 </select>
                                             </div>
 

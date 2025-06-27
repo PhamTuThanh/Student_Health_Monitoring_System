@@ -7,7 +7,7 @@ import { DoctorContext } from './context/DoctorContext';
 import { useAppContext } from './context/AppContext';
 import Navbar from './components/Navbar';
 import Sidebar from './components/Sidebar';
-import { Route, Routes } from 'react-router-dom';
+import { Route, Routes, Navigate } from 'react-router-dom';
 import DoctorsList from './pages/Admin/DoctorsList';
 import AddDoctor from './pages/Admin/AddDoctor';
 import Dashboard from './pages/Admin/Dashboard';
@@ -31,17 +31,25 @@ import AddExamSession from './pages/Admin/AddExamSession';
 const App = () => {
   const { aToken } = useContext(AdminContext)
   const { dToken } = useContext(DoctorContext)
+  const { isNavbarVisible } = useAppContext()
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
-  // Lắng nghe thay đổi sidebar từ localStorage
+  // Component để redirect tự động đến dashboard phù hợp
+  const DefaultRoute = () => {
+    if (aToken) {
+      return <Navigate to="/admin-dashboard" replace />;
+    } else if (dToken) {
+      return <Navigate to="/doctor-dashboard" replace />;
+    }
+    return <Navigate to="/admin-dashboard" replace />;
+  };
+
   useEffect(() => {
-    // Khởi tạo state từ localStorage
     const saved = localStorage.getItem('mainSidebarOpen');
     if (saved !== null) {
       setSidebarOpen(saved === 'true');
     }
 
-    // Lắng nghe thay đổi trong cùng tab (vì localStorage event không trigger trong cùng tab)
     const interval = setInterval(() => {
       const saved = localStorage.getItem('mainSidebarOpen');
       if (saved !== null) {
@@ -61,17 +69,14 @@ const App = () => {
     <div className='min-h-screen bg-[#f8f9fd]'>
       <ToastContainer />
       
-      {/* Fixed Navbar */}
-      <div className="fixed top-0 left-0 right-0 z-40">
-        <Navbar />
-      </div>
+      {/* Navbar với visibility conditional */}
+      <Navbar />
 
-      {/* Layout with Sidebar and Main Content */}
-      <div className="fixed left-0 top-16 bottom-0 z-30"> {/* pt-16 để tránh navbar che khuất */}
-        {/* Fixed Sidebar */}
+      <div className={`fixed left-0 bottom-0 z-30 transition-all duration-300 ${
+        isNavbarVisible ? 'top-16' : 'top-0'
+      }`}>
         <Sidebar />
         
-        {/* Main Content Area */}
         <div 
           className={`flex-1 transition-all duration-300 ease-in-out ${
             sidebarOpen 
@@ -79,10 +84,11 @@ const App = () => {
               : 'ml-[70px]'
           }`}
         >
-          <div className="min-h-screen p-4 "> 
+          <div className={`min-h-screen p-4 transition-all duration-300 ${
+            isNavbarVisible ? 'pt-4' : 'pt-4'
+          }`}> 
             <Routes>
-              {/* admin route */}
-              <Route path='/' element={<></>}/>
+              <Route path='/' element={<DefaultRoute />}/>
               <Route path='/admin-dashboard' element={<Dashboard/>}/>
               <Route path='/all-appoinment' element={<AllApoinments/>}/>
               <Route path='/add-doctor' element={<AddDoctor/>}/>
@@ -93,7 +99,7 @@ const App = () => {
               <Route path='/news-list' element={<NewsList/>}/>
               <Route path='/add-exam-session' element={<AddExamSession/>}/>
 
-              {/* doctor route */}
+              <Route path='/doctor' element={<Navigate to="/doctor-dashboard" replace />}/>
               <Route path='/doctor-dashboard' element={<DoctorDashboard/>}/>
               <Route path='/doctor-appoinments' element={<DoctorAppoinments/>}/>
               <Route path='/doctor-profile' element={<DoctorProfile/>}/>

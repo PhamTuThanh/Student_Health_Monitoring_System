@@ -204,18 +204,26 @@ const Messages = () => {
     );
   };
 
-  const filteredDoctors = doctors.filter(doctor => 
-    doctor.name.toLowerCase().includes(searchText.toLowerCase())
-  );
+  const filteredDoctors = doctors
+    .filter(doctor => 
+      doctor.name.toLowerCase().includes(searchText.toLowerCase())
+    )
+    .sort((a, b) => {
+      const aIsOnline = isDoctorOnline(a._id);
+      const bIsOnline = isDoctorOnline(b._id);
+      
+     
+      if (aIsOnline && !bIsOnline) return -1;
+      if (!aIsOnline && bIsOnline) return 1;
+      return a.name.localeCompare(b.name);
+    });
 
   const isSentByUser = (msg: Message) => msg.senderId === user?.id;
 
-  // Enhanced Chat List Screen
   const renderChatList = () => (
     <View style={styles.chatListContainer}>
       <StatusBar barStyle="light-content" backgroundColor="#2196F3" />
       
-      {/* Enhanced Search Bar */}
       <View style={styles.searchContainer}>
         <View style={styles.searchBar}>
           <Text style={styles.searchIcon}>🔍</Text>
@@ -234,7 +242,6 @@ const Messages = () => {
         </View>
       </View>
 
-      {/* Online Users Section */}
       {onlineUsers.length > 0 && (
         <View style={styles.onlineSection}>
           <Text style={styles.onlineSectionTitle}>Online</Text>
@@ -255,7 +262,6 @@ const Messages = () => {
         </View>
       )}
 
-      {/* Loading State */}
       {loading && (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#2196F3" />
@@ -263,7 +269,6 @@ const Messages = () => {
         </View>
       )}
 
-      {/* Enhanced Doctors List */}
       <ScrollView style={styles.doctorsList} showsVerticalScrollIndicator={false}>
         <Text style={styles.sectionTitle}>All conversations</Text>
         
@@ -301,7 +306,6 @@ const Messages = () => {
           );
         })}
         
-        {/* Enhanced Empty State */}
         {!loading && filteredDoctors.length === 0 && (
           <View style={styles.emptyState}>
             <Text style={styles.emptyStateIcon}>💬</Text>
@@ -317,7 +321,6 @@ const Messages = () => {
     </View>
   );
 
-  // Enhanced Chat Screen
   const renderChatScreen = () => {
     const isOnline = isDoctorOnline(selectedDoctor!._id);
     
@@ -325,7 +328,6 @@ const Messages = () => {
       <View style={styles.chatContainer}>
         <StatusBar barStyle="light-content" backgroundColor="#2196F3" />
         
-        {/* Enhanced Chat Header */}
         <View style={styles.chatHeader}>
           <TouchableOpacity 
             style={styles.backButton}
@@ -359,7 +361,6 @@ const Messages = () => {
           </View> */}
         </View>
 
-        {/* Enhanced Messages Container */}
         <View style={styles.messagesWrapper}>
           <ScrollView
             style={styles.messagesContainer}

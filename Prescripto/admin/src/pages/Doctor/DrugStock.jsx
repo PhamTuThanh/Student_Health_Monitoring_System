@@ -98,7 +98,6 @@ const DrugStock = () => {
         fetchDrugs();
     };
   
-    // Function to check if drug is near expiry (within 30 days)
     const isNearExpiry = (expiryDate) => {
         if (!expiryDate) return false;
         const today = new Date();
@@ -108,7 +107,6 @@ const DrugStock = () => {
         return daysDiff <= 30 && daysDiff > 0;
     };
 
-    // Function to check if drug is expired
     const isExpired = (expiryDate) => {
         if (!expiryDate) return false;
         const today = new Date();
@@ -116,7 +114,6 @@ const DrugStock = () => {
         return expiry < today;
     };
 
-    // Function to check low stock (less than 10)
     const isLowStock = (quantity) => {
         return quantity < 10;
     };
@@ -128,7 +125,6 @@ const DrugStock = () => {
         <div className="h-[calc(100vh-4rem)] overflow-y-auto">
             <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 p-6">
                 <div className="max-w-7xl mx-auto">
-                    {/* Header Section */}
                     <div className="mb-8">
                         <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
                             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -142,7 +138,6 @@ const DrugStock = () => {
                                 </div>
 
                                 <div className="flex items-center gap-4">
-                                    {/* Add Drug Button */}
                                     <button
                                         onClick={handleOpenAddDrug}
                                         className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-medium transition shadow-lg"
@@ -151,7 +146,6 @@ const DrugStock = () => {
                                         Add Drug
                                     </button>
 
-                                    {/* Search Bar */}
                                     <div className="relative">
                                         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                                             <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -169,7 +163,6 @@ const DrugStock = () => {
                                 </div>
                             </div>
 
-                            {/* Stats Cards */}
                             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-6">
                                 <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl p-4 text-white">
                                     <div className="flex items-center justify-between">
@@ -220,7 +213,6 @@ const DrugStock = () => {
                         </div>
                     </div>
 
-                    {/* Main Content */}
                     {loading ? (
                         <div className="flex items-center justify-center py-12">
                             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
@@ -232,15 +224,13 @@ const DrugStock = () => {
                             <div className="text-red-700 font-medium">{error}</div>
                         </div>
                     ) : (
-                        <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
-                            {/* Table Header */}
+                        <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden"> 
                             <div className="bg-gradient-to-r from-gray-50 to-gray-100 px-6 py-4 border-b border-gray-200">
                                 <h3 className="text-lg font-semibold text-gray-800">
                                     Drug Inventory ({filteredDrugs.length} items)
                                 </h3>
                             </div>
 
-                            {/* Table Container */}
                             <div className="overflow-x-auto" style={{ maxHeight: '500px', overflowY: 'auto' }}>
                                 <table className="min-w-full divide-y divide-gray-200">
                                     <thead className="bg-gray-50 sticky top-0 z-10">
@@ -367,7 +357,6 @@ const DrugStock = () => {
                         </div>
                     )}
 
-                    {/* Drug Detail Modal */}
                     <ModalWrapper isOpen={showDetail} onClose={handleCloseDetail}>
                         {selectedDrug && (
                             <DrugDetail
@@ -378,14 +367,12 @@ const DrugStock = () => {
                         )}
                     </ModalWrapper>
 
-                    {/* Add Drug Modal */}
                     <ModalWrapper isOpen={showAddDrug} onClose={handleCloseAddDrug}>
                         <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[95vh] overflow-hidden">
                             <AddDrug onClose={handleCloseAddDrug} onSuccess={handleAddDrugSuccess} />
                         </div>
                     </ModalWrapper>
 
-                    {/* Expiring Drugs Modal */}
                     <ModalWrapper isOpen={showExpiringModal} onClose={() => setShowExpiringModal(false)}>
                         <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] overflow-y-auto p-6">
                             <div className="flex justify-between items-center mb-4">
@@ -429,7 +416,6 @@ const DrugStock = () => {
                         </div>
                     </ModalWrapper>
 
-                    {/* Low Stock Drugs Modal */}
                     <ModalWrapper isOpen={showLowStockModal} onClose={() => setShowLowStockModal(false)}>
                         <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] overflow-y-auto p-6">
                             <div className="flex justify-between items-center mb-4">

@@ -27,7 +27,7 @@ const MessageContainer = () => {
 						</div>
 						<div>
 							<div className='text-gray-900 font-semibold'>{selectedConversation.name}</div>
-							<div className='text-xs text-gray-500'>Đang hoạt động</div>
+							<div className='text-xs text-gray-500'>Online</div>
 						</div>
 					</div>
 					
@@ -57,15 +57,15 @@ const NoChatSelected = () => {
 				</div>
 				
 				<h2 className='text-xl font-semibold text-gray-800 mb-2'>
-					Chào {userData?.name || "bạn"}! 👋
+					Hi {userData?.name || "you"}! 👋
 				</h2>
 				
 				<p className='text-gray-600 mb-4'>
-					Chọn một cuộc trò chuyện để bắt đầu nhắn tin
+					Select a conversation to start messaging
 				</p>
 				
 				<div className='text-sm text-gray-400'>
-					Tin nhắn của bạn sẽ hiển thị ở đây
+					Your messages will appear here
 				</div>
 			</div>
 		</div>

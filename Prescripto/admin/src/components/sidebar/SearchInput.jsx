@@ -25,7 +25,7 @@ const SearchInput = () => {
             setSearchResults(results);
             setIsSearching(false);
             if (results.length === 0) {
-                toast.error(`Không tìm thấy kết quả cho "${query}"`);
+                toast.error(`No results found for "${query}"`);
             }
         }, 500);
     };
@@ -55,7 +55,7 @@ const SearchInput = () => {
                 <div className="flex-1 flex items-center bg-gray-50 rounded-full px-3 py-2 border border-gray-200 focus-within:border-blue-300 focus-within:bg-white transition-all">
                     <input
                         type="text"
-                        placeholder="Tìm kiếm cuộc trò chuyện..."
+                        placeholder="Find conversation..."
                         className="flex-1 bg-transparent border-none outline-none text-sm placeholder-gray-500"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
@@ -87,13 +87,13 @@ const SearchInput = () => {
                 <div className="mt-2 bg-white border border-gray-200 shadow-sm w-full">
                     <div className="flex justify-between items-center py-1 border-b border-gray-100 px-2">
                         <span className="text-xs font-medium text-gray-700">
-                            Kết quả ({searchResults.length})
+                            Results ({searchResults.length})
                         </span>
                         <button
                             onClick={clearSearch}
                             className="text-xs text-blue-500 hover:text-blue-700"
                         >
-                            Xóa
+                            Clear
                         </button>
                     </div>
                     <div>
@@ -113,7 +113,7 @@ const SearchInput = () => {
             {/* No Results */}
             {searchQuery.trim() && searchResults.length === 0 && !isSearching && (
                 <div className="mt-3 text-center text-gray-500 text-sm py-2">
-                    Không tìm thấy kết quả cho "{searchQuery.trim()}"
+                    No results found for "{searchQuery.trim()}"
                 </div>
             )}
         </div>

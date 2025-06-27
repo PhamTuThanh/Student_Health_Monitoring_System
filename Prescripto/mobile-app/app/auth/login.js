@@ -240,32 +240,6 @@ export default function Login() {
                 </TouchableOpacity>
               </Animated.View>
 
-              {/* Divider */}
-              <View style={styles.divider}>
-                <View style={styles.dividerLine} />
-                <Text style={styles.dividerText}>or</Text>
-                <View style={styles.dividerLine} />
-              </View>
-
-              {/* Social Login */}
-              <View style={styles.socialContainer}>
-                <TouchableOpacity style={styles.socialButton}>
-                  <Text style={styles.socialIcon}>🔍</Text>
-                  <Text style={styles.socialText}>Google</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.socialButton}>
-                  <Text style={styles.socialIcon}>📘</Text>
-                  <Text style={styles.socialText}>Facebook</Text>
-                </TouchableOpacity>
-              </View>
-
-              {/* Sign Up Link */}
-              <View style={styles.signupContainer}>
-                <Text style={styles.signupText}>Don't have an account? </Text>
-                <TouchableOpacity>
-                  <Text style={styles.signupLink}>Sign Up</Text>
-                </TouchableOpacity>
-              </View>
             </View>
           )}
         </Formik>
@@ -452,60 +426,5 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 16,
-  },
-  divider: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 24,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: '#e5e7eb',
-  },
-  dividerText: {
-    marginHorizontal: 16,
-    color: '#6b7280',
-    fontSize: 14,
-  },
-  socialContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 24,
-  },
-  socialButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: 50,
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    marginHorizontal: 6,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-  },
-  socialIcon: {
-    fontSize: 20,
-    marginRight: 8,
-  },
-  socialText: {
-    color: '#374151',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  signupContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  signupText: {
-    color: '#6b7280',
-    fontSize: 14,
-  },
-  signupLink: {
-    color: '#6366f1',
-    fontSize: 14,
-    fontWeight: '600',
   },
 });

@@ -33,6 +33,11 @@ const Navbar = () => {
     return () => clearInterval(interval);
   }, [sidebarOpen]);
 
+  // Debug log for navbar visibility
+  useEffect(() => {
+    console.log('🎯 Navbar: isNavbarVisible changed to:', isNavbarVisible);
+  }, [isNavbarVisible]);
+
   const handleLogout = async () => {
     if (socket && socket.connected) {
       socket.disconnect();
@@ -47,12 +52,13 @@ const Navbar = () => {
     navigate('/');
   };
 
+  // Conditional rendering instead of CSS transform
+  if (!isNavbarVisible) {
+    return null;
+  }
+
   return (
-    <div
-      className={`fixed top-0 left-0 right-0 z-50 w-full bg-white shadow-sm border-b px-4 sm:px-10 py-3 flex items-center justify-between transition-all duration-300 ${
-        isNavbarVisible ? 'translate-y-0' : '-translate-y-full'
-      }`}
-    >
+    <div className="fixed top-0 left-0 right-0 z-50 w-full bg-white shadow-sm border-b px-4 sm:px-10 py-3 flex items-center justify-between">
       <div className='flex items-center gap-2 text-xs'>
         <img className='w-36 sm:w-40 cursor-pointer' src={assets.utc2_logo} alt="" />
         <p className='border px-2.5 py-0.5 rounded-full border-gray-500 text-gray-600'>

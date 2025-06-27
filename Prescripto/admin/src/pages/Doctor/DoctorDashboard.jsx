@@ -136,7 +136,7 @@ const DoctorDashboard = () => {
     return (
       <div className="fixed inset-0 z-50 flex flex-col justify-center items-center bg-white bg-opacity-70">
         <div className="w-16 h-16 border-4 border-blue-400 border-t-transparent rounded-full animate-spin mb-4"></div>
-        <div className="text-lg text-blue-600 font-semibold animate-pulse">Đang tải dữ liệu...</div>
+        <div className="text-lg text-blue-600 font-semibold animate-pulse">Loading...</div>
       </div>
     );
   }
@@ -173,7 +173,6 @@ const DoctorDashboard = () => {
         }
       `}</style>
       <div className='w-full max-w-6xl m-5 h-[80vh] overflow-y-scroll'>
-      {/* Welcome Header */}
       <div className='bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6'>
         <div className='flex items-center'>
           <div className='w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center mr-4'>
@@ -188,7 +187,6 @@ const DoctorDashboard = () => {
         </div>
       </div>
 
-      {/* Stats Cards */}
       <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6'>
         <div className='flex items-center gap-3 bg-white p-4 rounded-lg border border-gray-200 hover:shadow-md transition-all'>
           <div className='w-12 h-12 bg-red-100 rounded-full flex items-center justify-center'>
@@ -239,11 +237,8 @@ const DoctorDashboard = () => {
         </div>
       </div>
 
-      {/* Main Content Grid */}
       <div className='grid grid-cols-1 lg:grid-cols-3 gap-6'>
-        {/* Left Column - Abnormalities and Upcoming Events */}
         <div className='lg:col-span-2 space-y-6'>
-          {/* Recent Abnormalities */}
           <div className='bg-white rounded-lg shadow-sm border border-gray-200'>
           <div className='flex items-center justify-between px-6 py-4 border-b border-gray-200'>
             <div className='flex items-center gap-3'>
@@ -304,7 +299,6 @@ const DoctorDashboard = () => {
           </div>
           </div>
 
-          {/* Upcoming Events */}
           <div className='bg-white rounded-lg shadow-sm border border-gray-200'>
             <div className='px-4 py-3 border-b border-gray-200'>
               <h3 className='font-semibold text-gray-900'>Upcoming Events</h3>
