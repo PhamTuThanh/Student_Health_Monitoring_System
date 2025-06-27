@@ -82,13 +82,24 @@ export default function Abnormality() {
         <div className="flex items-center gap-2">
           <label className="font-semibold text-base">Cohort:</label>
           <select
-            className="border rounded px-3 py-1.5 min-w-[120px]"
-            value={selectedClass}
-            onChange={e => setSelectedClass(e.target.value)}
-          >
-            <option value="">All</option>
-            {classes.map(cls => <option key={cls} value={cls}>{cls}</option>)}
-          </select>
+              className="border rounded px-3 py-1.5 min-w-[120px]"
+              value={selectedClass}
+              onChange={(e) => setSelectedClass(e.target.value)}
+            >
+              <option value="">All</option>
+              {classes
+                .slice()
+                .sort((a, b) => {
+                  const numA = parseInt(a.match(/\d+/)?.[0] || '0', 10);
+                  const numB = parseInt(b.match(/\d+/)?.[0] || '0', 10);
+                  if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+                  return a.toLowerCase().localeCompare(b.toLowerCase(), undefined, { numeric: true });
+                })
+                .map(cls => (
+                  <option key={cls} value={cls}>{cls}</option>
+                ))}
+            </select>
+          
         </div>
         <div className="flex items-center gap-2">
           <label className="font-semibold text-base">Search:</label>

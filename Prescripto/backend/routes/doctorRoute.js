@@ -1,7 +1,7 @@
 import express from 'express';
 import { doctorList, loginDoctor, logoutDoctor, appoinmentsDoctor, appoinmentComplete, appoinmentCancel, doctorDashboard, doctorProfile, updateDoctorProfile, savePhysicalFitness, getAllPhysicalFitness
-    , getAllAbnormality, createAbnormality, getAbnormalityByStudentId, getPhysicalFitnessStatus, importPhysicalFitnessExcel, addDrug, importDrugExcel, getDrugStock, deleteDrug, updateDrug, getUsersForChat
-    , getPhysicalFitnessBySession, getListExamSession, addPrescription } from '../controllers/doctorController.js'; 
+    , getAllAbnormality, createAbnormality, getAbnormalityByStudentId, deleteAbnormality, getPhysicalFitnessStatus, importPhysicalFitnessExcel, addDrug, importDrugExcel, getDrugStock, deleteDrug, updateDrug, getUsersForChat
+    , getPhysicalFitnessBySession, getListExamSession, addPrescription, getPrescriptionByStudentId, getPrescriptionByAbnormalityId } from '../controllers/doctorController.js'; 
 import { authDoctor } from '../middlewares/authDoctor.js';
 import upload from '../middlewares/multer.js';
 const doctorRouter = express.Router();
@@ -20,6 +20,7 @@ doctorRouter.get('/get-physical-fitness', getAllPhysicalFitness);
 doctorRouter.get('/abnormality', getAllAbnormality);
 doctorRouter.post('/abnormality', createAbnormality);
 doctorRouter.get('/abnormality/:studentId', getAbnormalityByStudentId);
+doctorRouter.delete('/abnormality/:id', authDoctor, deleteAbnormality);
 doctorRouter.get('/physical-fitness-status', getPhysicalFitnessStatus);
 doctorRouter.post('/import-physical-fitness-excel',upload.single('file'), importPhysicalFitnessExcel);
 doctorRouter.post('/add-drug', authDoctor,upload.single('drugImage'), addDrug);
@@ -31,4 +32,6 @@ doctorRouter.get('/users-for-chat', authDoctor, getUsersForChat);
 doctorRouter.get('/physical-fitness-by-session', authDoctor, getPhysicalFitnessBySession);
 doctorRouter.get('/list-exam-sessions', getListExamSession);
 doctorRouter.post('/add-prescription', authDoctor, addPrescription);
+doctorRouter.get('/get-prescription/:studentId', authDoctor, getPrescriptionByStudentId);
+doctorRouter.get('/get-prescription/abnormality/:abnormalityId', authDoctor, getPrescriptionByAbnormalityId);
 export default doctorRouter;

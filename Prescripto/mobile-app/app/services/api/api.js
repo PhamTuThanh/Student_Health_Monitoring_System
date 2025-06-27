@@ -2,7 +2,8 @@ import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getSocket } from "../socket/socket";
 const { BACKEND_URL, BACKEND_URL_CHATBOT } = require('../../../ngrok-urls.json');
-
+import store from '../../redux/store';
+import { logoutAction } from '../../redux/authSlice';
 
 
 const loginUser = async (values) => {
@@ -155,7 +156,7 @@ const getChatHistory = async (studentId) => {
 
         return response.data;
     } catch (error) {
-        console.error("Error in getChatHistory:", error.response?.data || error.message);
+     //   console.error("Error in getChatHistory:", error.response?.data || error.message);
         throw error;
     }
 };
@@ -192,7 +193,7 @@ const getPhysicalData = async (studentId) => {
     });
     return response.data;
 };
-const getAbnormalData = async (studentId) => {
+const getAbnormality = async (studentId) => {
     const token = await AsyncStorage.getItem("token");
     if (!token) {
         throw new Error("No authentication token found");
@@ -202,4 +203,44 @@ const getAbnormalData = async (studentId) => {
     });
     return response.data;
 };
-export {loginUser, registerUser, getChatbot, getDataPhysical, messageSidebar, getMessage, sendMessage, saveChatHistory, getChatHistory, getAnnouncements, getInfoUser, getPhysicalData, getAbnormalData, forgotPassword, changePassword};
+const getPrescription = async (studentId) => {
+    const token = await AsyncStorage.getItem("token");
+    if (!token) {
+        throw new Error("No authentication token found");
+    }
+    const response = await axios.get(`${BACKEND_URL}/api/doctor/get-prescription/${studentId}`, {
+        headers: { "Authorization": `Bearer ${token}` }
+    });
+    return response.data;
+};
+const getHealthScores = async (studentId) => {
+    const token = await AsyncStorage.getItem("token");
+    if (!token) {
+        throw new Error("No authentication token found");
+    }
+    const response = await axios.get(`${BACKEND_URL}/api/user/get-health-scores/${studentId}`, {
+        headers: { "Authorization": `Bearer ${token}` }
+    });
+    return response.data;
+};
+axios.interceptors.response.use(
+    response => response,
+    async error => {
+        if (
+            error.response?.status === 401 &&
+            (error.response?.data?.message?.includes("token") ||
+             error.response?.data?.message?.toLowerCase().includes("auth"))
+        ) {
+            // Xóa token và user info
+            await AsyncStorage.removeItem("token");
+            await AsyncStorage.removeItem("userInfo");
+            
+            // Dispatch logout action để update Redux state
+            store.dispatch(logoutAction());
+            
+            console.log("Token expired - User logged out automatically");
+        }
+        return Promise.reject(error);
+    }
+);
+export {loginUser, registerUser, getChatbot, getDataPhysical, messageSidebar, getMessage, sendMessage, saveChatHistory, getChatHistory, getAnnouncements, getInfoUser, getPhysicalData, forgotPassword, changePassword, getAbnormality, getPrescription, getHealthScores};

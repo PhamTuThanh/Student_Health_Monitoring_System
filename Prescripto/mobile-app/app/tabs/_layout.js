@@ -18,6 +18,11 @@ export default function RootLayout() {
                     <FontAwesome name="comments" color={color} size={24} />
                 ),
             }} />
+            <Tabs.Screen name="abnormality" options={{headerShown: false, title: "Health Records",
+                tabBarIcon: ({ color}) => (
+                    <FontAwesome name="stethoscope" color={color} size={24} />
+                ),
+            }} />
             <Tabs.Screen name="profile" options={{headerShown: false, title: "Profile",
                 tabBarIcon: ({ color}) => (
                     <FontAwesome name="user" color={color} size={24} />

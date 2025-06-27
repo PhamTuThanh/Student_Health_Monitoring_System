@@ -114,19 +114,19 @@ const NewsList = () => {
       fetchNews();
       handleCloseDialog();
     } catch (err) {
-      alert('Có lỗi xảy ra!');
+      alert('An error occurred!');
     }
     setLoading(false);
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm('Bạn có chắc chắn muốn xóa tin tức này?')) {
+    if (window.confirm('Are you sure you want to delete this news?')) {
       setLoading(true);
       try {
         await axios.post(`${BACKEND_URL}/delete-news`, { id });
         fetchNews();
       } catch (err) {
-        alert('Không thể xóa tin tức');
+        alert('Cannot delete news');
       }
       setLoading(false);
     }
@@ -162,7 +162,7 @@ const NewsList = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 ml-10">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 ml-10 max-h-[80vh] overflow-y-scroll mb-20 ">
       {/* Modern Header with Glass Effect */}
       <div className="sticky top-0 z-40 backdrop-blur-xl bg-white/80 border-b border-white/20 shadow-lg">
         <div className="max-w-7xl mx-auto px-6 py-6">
@@ -265,7 +265,7 @@ const NewsList = () => {
                     <div className="p-6 space-y-4">
                       <div className="flex items-center justify-between">
                         <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-medium">
-                          {item.category || 'Tin tức'}
+                          {item.category || 'News'}
                         </span>
                         <span className="text-slate-500 text-sm">
                           {new Date(item.date).toLocaleDateString('vi-VN')}
@@ -282,7 +282,7 @@ const NewsList = () => {
                         <button
                           onClick={() => handleOpenDialog(item)}
                           className="p-3 text-blue-600 hover:bg-blue-50 rounded-2xl transition-all duration-300 group/btn hover:scale-110"
-                          title="Chỉnh sửa"
+                          title="Edit"
                         >
                           <svg className="w-5 h-5 group-hover/btn:rotate-12 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -291,7 +291,7 @@ const NewsList = () => {
                         <button
                           onClick={() => handleDelete(item._id)}
                           className="p-3 text-red-600 hover:bg-red-50 rounded-2xl transition-all duration-300 group/btn hover:scale-110"
-                          title="Xóa"
+                          title="Delete"
                         >
                           <svg className="w-5 h-5 group-hover/btn:rotate-12 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -319,7 +319,7 @@ const NewsList = () => {
                       <div className="flex-1 space-y-4">
                         <div className="flex items-center justify-between">
                           <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-medium">
-                            {item.category || 'Tin tức'}
+                            {item.category || 'News'}
                           </span>
                           <span className="text-slate-500 text-sm">
                             {new Date(item.date).toLocaleDateString('vi-VN')}
@@ -335,7 +335,7 @@ const NewsList = () => {
                           <button
                             onClick={() => handleOpenDialog(item)}
                             className="p-3 text-blue-600 hover:bg-blue-50 rounded-2xl transition-all duration-300 group/btn hover:scale-110"
-                            title="Chỉnh sửa"
+                            title="Edit"
                           >
                             <svg className="w-5 h-5 group-hover/btn:rotate-12 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -344,7 +344,7 @@ const NewsList = () => {
                           <button
                             onClick={() => handleDelete(item._id)}
                             className="p-3 text-red-600 hover:bg-red-50 rounded-2xl transition-all duration-300 group/btn hover:scale-110"
-                            title="Xóa"
+                            title="Delete"
                           >
                             <svg className="w-5 h-5 group-hover/btn:rotate-12 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -370,12 +370,12 @@ const NewsList = () => {
                 </svg>
               </div>
               <h3 className="text-2xl font-bold text-slate-800 mb-2">
-                {searchTerm ? 'Không tìm thấy kết quả' : 'Chưa có tin tức'}
+                {searchTerm ? 'No results found' : 'No news yet'}
               </h3>
               <p className="text-slate-600 mb-8">
                 {searchTerm 
-                  ? `Không có tin tức nào phù hợp với "${searchTerm}"`
-                  : 'Bắt đầu bằng cách tạo tin tức mới cho trang web của bạn.'
+                  ? `No news found for "${searchTerm}"`
+                  : 'Start by creating a news article for your website.'
                 }
               </p>
               {!searchTerm && (
@@ -383,7 +383,7 @@ const NewsList = () => {
                   onClick={() => handleOpenDialog()}
                   className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-8 py-4 rounded-2xl hover:from-blue-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:ring-offset-2 transition-all duration-300 font-semibold shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
                 >
-                  + Thêm tin tức đầu tiên
+                  + Add the first news article
                 </button>
               )}
             </div>
@@ -398,7 +398,7 @@ const NewsList = () => {
             <div className="bg-gradient-to-r from-blue-600 to-purple-600 px-8 py-6 rounded-2xl mb-6">
               <div className="flex justify-between items-center">
                 <h2 className="text-2xl font-bold text-white">
-                  {selectedNews ? 'Chỉnh sửa tin tức' : 'Thêm tin tức mới'}
+                  {selectedNews ? 'Edit news' : 'Add news'}
                 </h2>
                 
               </div>
@@ -406,7 +406,7 @@ const NewsList = () => {
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="space-y-2">
                 <label className="block text-lg font-semibold text-slate-800 mb-3">
-                  Tiêu đề tin tức
+                  News title
                 </label>
                 <input
                   type="text"
@@ -414,13 +414,13 @@ const NewsList = () => {
                   value={formData.title}
                   onChange={handleInputChange}
                   className="w-full px-6 py-4 bg-white/70 backdrop-blur-sm border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-transparent transition-all duration-300 text-slate-800 text-lg"
-                  placeholder="Nhập tiêu đề hấp dẫn cho tin tức..."
+                  placeholder="Enter a catchy title for the news..."
                   required
                 />
               </div>
               <div className="space-y-2">
                 <label className="block text-lg font-semibold text-slate-800 mb-3">
-                  Danh mục
+                  Category
                 </label>
                 <input
                   type="text"
@@ -428,13 +428,13 @@ const NewsList = () => {
                   value={formData.category}
                   onChange={handleInputChange}
                   className="w-full px-6 py-4 bg-white/70 backdrop-blur-sm border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-transparent transition-all duration-300 text-slate-800 text-lg"
-                  placeholder="Nhập danh mục tin tức..."
+                  placeholder="Enter the category..."
                   required
                 />
               </div>
               <div className="space-y-2">
                 <label className="block text-lg font-semibold text-slate-800 mb-3">
-                  Ngày đăng
+                  Date
                 </label>
                 <input
                   type="date"
@@ -447,7 +447,7 @@ const NewsList = () => {
               </div>
               <div className="space-y-2">
                 <label className="block text-lg font-semibold text-slate-800 mb-3">
-                  Nội dung
+                  Content
                 </label>
                 <textarea
                   name="content"
@@ -455,13 +455,13 @@ const NewsList = () => {
                   onChange={handleInputChange}
                   rows={8}
                   className="w-full px-6 py-4 bg-white/70 backdrop-blur-sm border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-transparent transition-all duration-300 text-slate-800 text-lg resize-none"
-                  placeholder="Viết nội dung chi tiết cho tin tức của bạn..."
+                  placeholder="Write detailed content for your news..."
                   required
                 />
               </div>
               <div className="space-y-2">
                 <label className="block text-lg font-semibold text-slate-800 mb-3">
-                  File đính kèm (ảnh hoặc PDF)
+                  Attachment (image or PDF)
                 </label>
                 <div className="relative">
                   <div className="border-2 border-dashed border-blue-300 rounded-2xl p-8 hover:border-blue-400 transition-all duration-300 bg-gradient-to-br from-blue-50 to-purple-50">
@@ -470,10 +470,10 @@ const NewsList = () => {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                       </svg>
                       <div className="text-lg font-medium text-slate-700 mb-2">
-                        Chọn file ảnh hoặc PDF
+                        Select image or PDF
                       </div>
                       <div className="text-slate-500 mb-4">
-                        PNG, JPG, GIF, PDF tối đa 10MB
+                        PNG, JPG, GIF, PDF maximum 10MB
                       </div>
                     </div>
                     <input
@@ -491,7 +491,7 @@ const NewsList = () => {
                   onClick={handleCloseDialog}
                   className="px-8 py-4 text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-slate-500/50 focus:ring-offset-2 transition-all duration-300 font-semibold"
                 >
-                  Hủy bỏ
+                  Cancel
                 </button>
                 <button
                   type="submit"
@@ -501,14 +501,14 @@ const NewsList = () => {
                   {loading ? (
                     <>
                       <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                      Đang xử lý...
+                      Processing...
                     </>
                   ) : (
                     <>
                       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
                       </svg>
-                      {selectedNews ? 'Cập nhật tin tức' : 'Tạo tin tức mới'}
+                      {selectedNews ? 'Update news' : 'Create news'}
                     </>
                   )}
                 </button>

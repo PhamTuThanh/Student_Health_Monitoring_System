@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Pill, Clock, FileText, Calendar, User, AlertCircle, Plus, Trash2 } from 'lucide-react';
 import axios from 'axios';
 import { useNavbarControl } from '../hooks/useNavbarControl';
+import { toast } from 'react-toastify';
 
 const AddPrescription = ({ selectedAbnormality, onClose }) => {
     const { hideNavbar, showNavbar } = useNavbarControl(false);
@@ -20,6 +21,7 @@ const AddPrescription = ({ selectedAbnormality, onClose }) => {
         {
             id: 1,
             drugId: "",
+            quantity: "",
             dosage: "",
             frequency: "",
             duration: "",
@@ -52,6 +54,7 @@ const AddPrescription = ({ selectedAbnormality, onClose }) => {
         setMedicines([...medicines, {
             id: newId,
             drugId: "",
+            quantity: "",
             dosage: "",
             frequency: "",
             duration: "",
@@ -89,6 +92,7 @@ const AddPrescription = ({ selectedAbnormality, onClose }) => {
             diagnosis,
             medicines: medicines.map(m => ({
                 drugId: m.drugId,
+                quantity: m.quantity,
                 dosage: m.dosage,
                 frequency: m.frequency,
                 duration: m.duration,
@@ -114,8 +118,7 @@ const AddPrescription = ({ selectedAbnormality, onClose }) => {
                 alert(`Error: ${response.data.message}`);
             }
         } catch (error) {
-            console.error("Error saving prescription:", error);
-            alert("Failed to save prescription. Check the console for more details.");
+            toast.error(error.response.data.message);
         }
     };
 
@@ -265,6 +268,29 @@ const AddPrescription = ({ selectedAbnormality, onClose }) => {
                                                         </option>
                                                     ))}
                                                 </select>
+                                            </div>
+
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                    Quantity *
+                                                </label>
+                                                <input
+                                                    type="number"
+                                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                                                    value={medicine.quantity}
+                                                    min={0}
+                                                    onChange={(e) => {
+                                                        const value = e.target.value;
+                                                        // Nếu nhập số âm thì chuyển thành 0
+                                                        if (Number(value) < 0) {
+                                                            updateMedicine(medicine.id, 'quantity', 0);
+                                                        } else {
+                                                            updateMedicine(medicine.id, 'quantity', value);
+                                                        }
+                                                    }}
+                                                    placeholder="e.g., 1 tablet, 5ml"
+                                                    required
+                                                />
                                             </div>
 
                                             <div>

@@ -361,7 +361,7 @@ const Chatbot: React.FC = () => {
                 </View>
                 <View>
                   <Text style={styles.headerTitle}>Health AI Assistant</Text>
-                  <Text style={styles.headerSubtitle}>Trợ lý sức khỏe thông minh</Text>
+                  {/* <Text style={styles.headerSubtitle}>Trợ lý sức khỏe thông minh</Text> */}
                 </View>
               </View>
               
@@ -403,7 +403,7 @@ const Chatbot: React.FC = () => {
               
               <TextInput
                 style={[styles.input, { height: Math.max(40, inputHeight - 10) }]}
-                placeholder="Nhập câu hỏi về sức khỏe..."
+                placeholder="Ask me anything about health..."
                 placeholderTextColor="#9ca3af"
                 value={input}
                 onChangeText={handleInputChange}
@@ -437,9 +437,7 @@ const Chatbot: React.FC = () => {
             </View>
             
             {/* Character counter */}
-            <Text style={styles.characterCounter}>
-              {input.length}/500
-            </Text>
+            
           </View>
         </View>
       </KeyboardAvoidingView>

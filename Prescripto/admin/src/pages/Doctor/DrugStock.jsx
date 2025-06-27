@@ -17,6 +17,8 @@ const DrugStock = () => {
     const [search, setSearch] = useState("");
     const [filteredDrugs, setFilteredDrugs] = useState([]);
     const [showAddDrug, setShowAddDrug] = useState(false);
+    const [showExpiringModal, setShowExpiringModal] = useState(false);
+    const [showLowStockModal, setShowLowStockModal] = useState(false);
 
     const fetchDrugs = async () => {
         setLoading(true);
@@ -82,10 +84,12 @@ const DrugStock = () => {
     };
 
     const handleOpenAddDrug = () => {
+        hideNavbar();
         setShowAddDrug(true);
     };
 
     const handleCloseAddDrug = () => {
+        showNavbar();
         setShowAddDrug(false);
     };
 
@@ -116,6 +120,9 @@ const DrugStock = () => {
     const isLowStock = (quantity) => {
         return quantity < 10;
     };
+
+    const expiringDrugs = filteredDrugs.filter(drug => isNearExpiry(drug.expiryDate) || isExpired(drug.expiryDate));
+    const lowStockDrugs = filteredDrugs.filter(drug => isLowStock(drug.inventoryQuantity));
 
     return (
         <div className="h-[calc(100vh-4rem)] overflow-y-auto">
@@ -186,24 +193,24 @@ const DrugStock = () => {
                                     </div>
                                 </div>
 
-                                <div className="bg-gradient-to-r from-orange-500 to-orange-600 rounded-xl p-4 text-white">
+                                <div className="bg-gradient-to-r from-orange-500 to-orange-600 rounded-xl p-4 text-white cursor-pointer" onClick={() => setShowLowStockModal(true)}>
                                     <div className="flex items-center justify-between">
                                         <div>
                                             <p className="text-orange-100 text-sm">Low Stock</p>
                                             <p className="text-2xl font-bold">
-                                                {filteredDrugs.filter(drug => isLowStock(drug.inventoryQuantity)).length}
+                                                {lowStockDrugs.length}
                                             </p>
                                         </div>
                                         <div className="text-orange-200 text-2xl">⚠️</div>
                                     </div>
                                 </div>
 
-                                <div className="bg-gradient-to-r from-red-500 to-red-600 rounded-xl p-4 text-white">
+                                <div className="bg-gradient-to-r from-red-500 to-red-600 rounded-xl p-4 text-white cursor-pointer" onClick={() => setShowExpiringModal(true)}>
                                     <div className="flex items-center justify-between">
                                         <div>
                                             <p className="text-red-100 text-sm">Expiring Soon</p>
                                             <p className="text-2xl font-bold">
-                                                {filteredDrugs.filter(drug => isNearExpiry(drug.expiryDate) || isExpired(drug.expiryDate)).length}
+                                                {expiringDrugs.length}
                                             </p>
                                         </div>
                                         <div className="text-red-200 text-2xl">⏰</div>
@@ -375,6 +382,92 @@ const DrugStock = () => {
                     <ModalWrapper isOpen={showAddDrug} onClose={handleCloseAddDrug}>
                         <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[95vh] overflow-hidden">
                             <AddDrug onClose={handleCloseAddDrug} onSuccess={handleAddDrugSuccess} />
+                        </div>
+                    </ModalWrapper>
+
+                    {/* Expiring Drugs Modal */}
+                    <ModalWrapper isOpen={showExpiringModal} onClose={() => setShowExpiringModal(false)}>
+                        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] overflow-y-auto p-6">
+                            <div className="flex justify-between items-center mb-4">
+                                <h2 className="text-xl font-bold text-red-600">Drugs Expiring Soon</h2>
+                                <button onClick={() => setShowExpiringModal(false)} className="text-gray-500 hover:text-red-500 text-2xl font-bold">&times;</button>
+                            </div>
+                            {expiringDrugs.length === 0 ? (
+                                <div className="text-gray-500 text-center py-8">No drugs expiring soon.</div>
+                            ) : (
+                                <table className="min-w-full text-sm">
+                                    <thead>
+                                        <tr className="bg-gray-100">
+                                            <th className="px-3 py-2 text-left">Name</th>
+                                            <th className="px-3 py-2 text-left">Code</th>
+                                            <th className="px-3 py-2 text-left">Expiry Date</th>
+                                            <th className="px-3 py-2 text-left">Stock</th>
+                                            <th className="px-3 py-2 text-left">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {expiringDrugs.map(drug => (
+                                            <tr key={drug._id} className="border-b">
+                                                <td className="px-3 py-2">{drug.drugName}</td>
+                                                <td className="px-3 py-2">{drug.drugCode}</td>
+                                                <td className="px-3 py-2">{drug.expiryDate ? new Date(drug.expiryDate).toLocaleDateString() : 'N/A'}</td>
+                                                <td className="px-3 py-2">{drug.inventoryQuantity}</td>
+                                                <td className="px-3 py-2">
+                                                    <button
+                                                        onClick={() => handleDelete(drug._id)}
+                                                        className="bg-red-100 hover:bg-red-200 text-red-600 p-2 rounded-lg transition-colors duration-200 group"
+                                                        title="Delete Drug"
+                                                    >
+                                                        <span className="font-bold">Delete</span>
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            )}
+                        </div>
+                    </ModalWrapper>
+
+                    {/* Low Stock Drugs Modal */}
+                    <ModalWrapper isOpen={showLowStockModal} onClose={() => setShowLowStockModal(false)}>
+                        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] overflow-y-auto p-6">
+                            <div className="flex justify-between items-center mb-4">
+                                <h2 className="text-xl font-bold text-orange-600">Low Stock Drugs</h2>
+                                <button onClick={() => setShowLowStockModal(false)} className="text-gray-500 hover:text-orange-500 text-2xl font-bold">&times;</button>
+                            </div>
+                            {lowStockDrugs.length === 0 ? (
+                                <div className="text-gray-500 text-center py-8">No drugs with low stock.</div>
+                            ) : (
+                                <table className="min-w-full text-sm">
+                                    <thead>
+                                        <tr className="bg-gray-100">
+                                            <th className="px-3 py-2 text-left">Name</th>
+                                            <th className="px-3 py-2 text-left">Code</th>
+                                            <th className="px-3 py-2 text-left">Stock</th>
+                                            <th className="px-3 py-2 text-left">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {lowStockDrugs.map(drug => (
+                                            <tr key={drug._id} className="border-b">
+                                                <td className="px-3 py-2">{drug.drugName}</td>
+                                                <td className="px-3 py-2">{drug.drugCode}</td>
+                                                <td className="px-3 py-2">{drug.inventoryQuantity}</td>
+                                                <td className="px-3 py-2">
+                                                    <button
+                                                        onClick={() => handleDelete(drug._id)}
+                                                        className="bg-red-100 hover:bg-red-200 text-red-600 p-2 rounded-lg transition-colors duration-200 group"
+                                                        title="Delete Drug"
+                                                    >
+                                                        <span className="font-bold">Delete</span>
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            )}
                         </div>
                     </ModalWrapper>
                 </div>

@@ -24,10 +24,10 @@ export default function Profile() {
   const mutation = useMutation({
     mutationFn: changePassword,
     onSuccess: () => {
-      Alert.alert("Thành công", "Mật khẩu đã được thay đổi");
+      Alert.alert("Success", "Password has been changed");
     },
     onError: () => {
-      Alert.alert("Lỗi", "Mật khẩu đã được thay đổi");
+      Alert.alert("Error", "Password has been changed");
     }
   });
   const handleLogout = () => {
@@ -50,33 +50,33 @@ export default function Profile() {
               <Ionicons name="camera-outline" size={20} color="white" />
             </View>
           </View>
-          <Text style={styles.profileTitle}>THÔNG TIN CÁ NHÂN</Text>
-          <Text style={styles.label}>HỌ TÊN: <Text style={styles.value}>{user?.name}</Text></Text>
-          <Text style={styles.label}>LỚP: <Text style={styles.value}>{user?.major}</Text></Text>
-          <Text style={styles.label}>KHÓA: <Text style={styles.value}>{user?.cohort}</Text></Text>
-          <Text style={styles.label}>MSSV: <Text style={styles.value}>{user?.studentId}</Text></Text>
+          <Text style={styles.profileTitle}>PERSONAL INFORMATION</Text>
+          <Text style={styles.label}>NAME: <Text style={styles.value}>{user?.name}</Text></Text>
+          <Text style={styles.label}>MAJOR: <Text style={styles.value}>{user?.major}</Text></Text>
+          <Text style={styles.label}>COHORT: <Text style={styles.value}>{user?.cohort}</Text></Text>
+          <Text style={styles.label}>STUDENT ID: <Text style={styles.value}>{user?.studentId}</Text></Text>
 
           <TouchableOpacity style={styles.changePassword} onPress={() => router.push("/auth/changePassword")} disabled={mutation.isPending}>
-            <Text style={styles.changePasswordText}>Đổi mật khẩu</Text>
+            <Text style={styles.changePasswordText}>Change password</Text>
           </TouchableOpacity>
         </View>
 
         <View style={styles.infoSection}>
-          <Text style={styles.infoItem}>NGÀY SINH: </Text>
+            <Text style={styles.infoItem}>DATE OF BIRTH: </Text>
           <Text style={styles.infoValue}>{user?.dob}</Text>
           <View style={styles.separator} />
           <Text style={styles.infoItem}>EMAIL: </Text>
           <Text style={styles.infoValue}>{user?.email}</Text>
           <View style={styles.separator} />
-          <Text style={styles.infoItem}>SỐ ĐIỆN THOẠI: </Text>
+          <Text style={styles.infoItem}>PHONE NUMBER: </Text>
           <Text style={styles.infoValue}>{user?.phone}</Text>
           <View style={styles.separator} />
-          <Text style={styles.infoItem}>ĐỊA CHỈ: </Text>
+          <Text style={styles.infoItem}>ADDRESS: </Text>
           <Text style={styles.infoValue}>{user?.address?.line1} {user?.address?.line2}</Text>
         </View>
 
         <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-          <Text style={styles.logoutText}>Đăng xuất</Text>
+          <Text style={styles.logoutText}>Logout</Text>
         </TouchableOpacity>
       </ScrollView>
     </ProtectedRoute>

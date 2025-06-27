@@ -16,7 +16,7 @@ const AddNews = () => {
     const handleFileChange = (e) => {
         const selectedFile = e.target.files[0];
         if (selectedFile && selectedFile.type !== 'application/pdf') {
-            toast.error('Vui lòng chọn file PDF');
+            toast.error('Please select a PDF file');
             e.target.value = null;
             return;
         }
@@ -27,7 +27,7 @@ const AddNews = () => {
         event.preventDefault()
         try {
             if(!file){
-                return toast.error('Vui lòng chọn file PDF')
+                return toast.error('Please select a PDF file')
             }
             setLoading(true)
             const formData = new FormData()
@@ -61,11 +61,11 @@ const AddNews = () => {
     }
     
     return (
-        <div className='min-h-screen bg-gray-50 py-8 px-4 ml-10'>
+        <div className='min-h-screen bg-gray-50 py-8 px-4 ml-10 max-h-[80vh] overflow-y-scroll pb-20 '>
             <div className='max-w-2xl mx-auto'>
                 <div className='mb-8'>
-                    <h1 className='text-2xl font-semibold text-gray-900'>Thêm Tin Tức</h1>
-                    <p className='text-gray-600 mt-1'>Tạo bài viết tin tức mới</p>
+                    <h1 className='text-2xl font-semissbold text-gray-900'>Add News</h1>
+                    <p className='text-gray-600 mt-1'>Create a new news article</p>
                 </div>
 
                 <form onSubmit={onSubmitHandler} className='bg-white rounded-lg shadow-sm border border-gray-200'>
@@ -73,14 +73,14 @@ const AddNews = () => {
                         {/* Tiêu đề */}
                         <div className='space-y-2'>
                             <label className='block text-sm font-medium text-gray-700'>
-                                Tiêu đề
+                                Title
                             </label>
                             <input
                                 type="text"
                                 className='w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors'
                                 value={title}
                                 onChange={e => setTitle(e.target.value)}
-                                placeholder='Nhập tiêu đề bài viết'
+                                placeholder='Enter the title of the article'
                                 required
                             />
                         </div>
@@ -89,20 +89,20 @@ const AddNews = () => {
                         <div className='grid grid-cols-1 md:grid-cols-2 gap-6'>
                             <div className='space-y-2'>
                                 <label className='block text-sm font-medium text-gray-700'>
-                                    Danh mục
+                                    Category
                                 </label>
                                 <input
                                     type="text"
                                     className='w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors'
                                     value={category}
                                     onChange={e => setCategory(e.target.value)}
-                                    placeholder='Nhập danh mục'
+                                    placeholder='Enter the category'
                                     required
                                 />
                             </div>
                             <div className='space-y-2'>
                                 <label className='block text-sm font-medium text-gray-700'>
-                                    Ngày
+                                    Date
                                 </label>
                                 <input
                                     type="date"
@@ -117,14 +117,14 @@ const AddNews = () => {
                         {/* Nội dung */}
                         <div className='space-y-2'>
                             <label className='block text-sm font-medium text-gray-700'>
-                                Nội dung
+                                Content
                             </label>
                             <textarea
                                 className='w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors resize-none'
                                 value={content}
                                 onChange={e => setContent(e.target.value)}
                                 rows={6}
-                                placeholder='Nhập nội dung bài viết...'
+                                placeholder='Enter the content of the article...'
                                 required
                             />
                         </div>
@@ -132,7 +132,7 @@ const AddNews = () => {
                         {/* File PDF */}
                         <div className='space-y-2'>
                             <label className='block text-sm font-medium text-gray-700'>
-                                Tài liệu đính kèm (PDF)
+                                Attachment
                             </label>
                             <div className='border-2 border-dashed border-gray-300 rounded-md p-4 hover:border-gray-400 transition-colors'>
                                 <input
@@ -147,7 +147,7 @@ const AddNews = () => {
                                         <svg className='w-4 h-4 mr-2' fill='currentColor' viewBox='0 0 20 20'>
                                             <path fillRule='evenodd' d='M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z' clipRule='evenodd' />
                                         </svg>
-                                        Đã chọn: {file.name}
+                                        Selected: {file.name}
                                     </div>
                                 )}
                             </div>

@@ -55,7 +55,7 @@ const DataAnalysis = () => {
     if (!examSessionId) return;
     setLoading(true);
     let url = `${backendUrl}/api/doctor/physical-fitness-status?examSessionId=${examSessionId}`;
-    if (selectedClass && selectedClass !== "") {
+    if (selectedClass && selectedClass !== "" && selectedClass !== "All") {
       url += `&cohort=${encodeURIComponent(selectedClass)}`;
     }
     axios.get(url)
@@ -196,7 +196,7 @@ const DataAnalysis = () => {
           <h3 className="text-lg font-semibold text-gray-800 mb-4">Filters & Options</h3>
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             <select onChange={(e) => setExamSessionId(e.target.value)} value={examSessionId} className="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
-              {examSessions.length === 0 && <option value="">Không có kỳ thi</option>}
+              {examSessions.length === 0 && <option value="">No exam session</option>}
               {examSessions.length > 0 && examSessions.map(session => (
                 <option key={session._id} value={session._id}>{session.examSessionAcademicYear} </option>
               ))}
@@ -207,7 +207,7 @@ const DataAnalysis = () => {
               onChange={e => setSelectedClass(e.target.value)}
               disabled={classes.length === 0}
             >
-              <option value="">All</option>
+              <option value="All">All</option>
               {classes
                 .slice()
                 .sort((a, b) => {

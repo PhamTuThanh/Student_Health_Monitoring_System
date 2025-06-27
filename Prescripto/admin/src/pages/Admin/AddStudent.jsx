@@ -89,8 +89,8 @@ function AddStudent() {
   //   }
   // };
   return (
-    <form onSubmit={onSubmitHandler} className='m-5 w-full ml-10'>
-      <div className="flex items-center justify-between mb-8 ">
+    <form onSubmit={onSubmitHandler} className='m-5 w-full ml-10 max-h-[80vh] overflow-y-scroll'>
+      <div className="flex items-center justify-between ">
         <h1 className="text-2xl font-bold text-gray-800">Add Student</h1>
         <button
           className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded shadow font-medium transition"
@@ -107,7 +107,7 @@ function AddStudent() {
       </div>
 
 
-      <div className='bg-white px-8 py-8 border rounded w-full max-w-4xl max-h-[80vh] overflow-y-scroll'>
+      <div className='bg-white px-8 py-8 border rounded w-full max-w-4xl '>
         <div className='flex items-center gap-4 mb-8 text-gray-500'>
           <label htmlFor="doc-img">
             <img className='w-16 bg-gray-100 rounded-full cursor-pointer' src={studentImg ? URL.createObjectURL(studentImg) : assets.upload_area} alt="" />

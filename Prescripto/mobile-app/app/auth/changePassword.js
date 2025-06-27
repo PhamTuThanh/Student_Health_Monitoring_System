@@ -18,15 +18,15 @@ const ChangePasswordScreen = () => {
 
   const handleChangePassword = async () => {
     if (!oldPassword || !newPassword || !confirmPassword) {
-      Alert.alert('Lỗi', 'Vui lòng điền đầy đủ các trường.');
+      Alert.alert('Error', 'Please fill in all fields.');
       return;
     }
     if (newPassword !== confirmPassword) {
-      Alert.alert('Lỗi', 'Mật khẩu mới và mật khẩu xác nhận không khớp.');
+      Alert.alert('Error', 'New password and confirm password do not match.');
       return;
     }
     if (newPassword.length < 8) {
-      Alert.alert('Lỗi', 'Mật khẩu mới phải có ít nhất 8 ký tự.');
+      Alert.alert('Error', 'New password must be at least 8 characters.');
       return;
     }
 
@@ -41,17 +41,17 @@ const ChangePasswordScreen = () => {
       });
 
       if (response.success) {
-        Alert.alert('Thành công', 'Mật khẩu đã được thay đổi thành công.', [
+        Alert.alert('Success', 'Password changed successfully.', [
           { text: 'OK', onPress: () => router.back() },
         ]);
       } else {
-        setError(response.message || 'Đã xảy ra lỗi. Vui lòng thử lại.');
-        Alert.alert('Lỗi', response.message || 'Đã xảy ra lỗi. Vui lòng thử lại.');
+        setError(response.message || 'An error occurred. Please try again.');
+        Alert.alert('Error', response.message || 'An error occurred. Please try again.');
       }
     } catch (err) {
-      const errorMessage = err.response?.data?.message || 'Không thể kết nối đến máy chủ. Vui lòng kiểm tra lại kết nối mạng.';
+      const errorMessage = err.response?.data?.message || 'Could not connect to server. Please check your network connection.';
       setError(errorMessage);
-      Alert.alert('Lỗi', errorMessage);
+      Alert.alert('Error', errorMessage);
     } finally {
       setLoading(false);
     }
@@ -66,21 +66,21 @@ const ChangePasswordScreen = () => {
             <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
                 <Ionicons name="arrow-back" size={24} color="#333" />
             </TouchableOpacity>
-            <Text style={styles.title}>Đổi Mật Khẩu</Text>
+            <Text style={styles.title}>Change Password</Text>
         </View>
 
         <Text style={styles.subtitle}>
-            Để bảo vệ tài khoản của bạn, hãy đảm bảo mật khẩu mới có ít nhất 8 ký tự.
+            To protect your account, please ensure your new password is at least 8 characters.
         </Text>
 
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
         <View style={styles.inputContainer}>
-            <Text style={styles.label}>Mật khẩu cũ</Text>
+            <Text style={styles.label}>Old Password</Text>
             <View style={styles.passwordInput}>
                 <TextInput
                     style={styles.input}
-                    placeholder="Nhập mật khẩu cũ của bạn"
+                    placeholder="Enter your old password"
                     secureTextEntry={!showOldPassword}
                     value={oldPassword}
                     onChangeText={setOldPassword}
@@ -93,11 +93,11 @@ const ChangePasswordScreen = () => {
         </View>
 
         <View style={styles.inputContainer}>
-            <Text style={styles.label}>Mật khẩu mới</Text>
+            <Text style={styles.label}>New Password</Text>
             <View style={styles.passwordInput}>
                 <TextInput
                     style={styles.input}
-                    placeholder="Nhập mật khẩu mới"
+                    placeholder="Enter your new password"
                     secureTextEntry={!showNewPassword}
                     value={newPassword}
                     onChangeText={setNewPassword}
@@ -110,11 +110,11 @@ const ChangePasswordScreen = () => {
         </View>
 
         <View style={styles.inputContainer}>
-            <Text style={styles.label}>Xác nhận mật khẩu mới</Text>
+            <Text style={styles.label}>Confirm New Password</Text>
             <View style={styles.passwordInput}>
                 <TextInput
                     style={styles.input}
-                    placeholder="Nhập lại mật khẩu mới"
+                    placeholder="Enter your new password again"
                     secureTextEntry={!showConfirmPassword}
                     value={confirmPassword}
                     onChangeText={setConfirmPassword}
@@ -134,7 +134,7 @@ const ChangePasswordScreen = () => {
           {loading ? (
             <ActivityIndicator size="small" color="#fff" />
           ) : (
-            <Text style={styles.buttonText}>Đổi Mật Khẩu</Text>
+            <Text style={styles.buttonText}>Change Password</Text>
           )}
         </TouchableOpacity>
     </KeyboardAvoidingView>

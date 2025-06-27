@@ -26,14 +26,14 @@ const ForgotPassword = () => {
 
   const handleForgotPassword = async () => {
     if (!email.trim()) {
-      Alert.alert('Lỗi', 'Vui lòng nhập email của bạn');
+      Alert.alert('Error', 'Please enter your email');
       return;
     }
 
     // Kiểm tra email hợp lệ
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
-      Alert.alert('Lỗi', 'Email không hợp lệ');
+      Alert.alert('Error', 'Invalid email');
       return;
     }
 
@@ -53,8 +53,8 @@ const ForgotPassword = () => {
       if (response.ok) {
         setEmailSent(true);
         Alert.alert(
-          'Thành công',
-          'Email đặt lại mật khẩu đã được gửi. Vui lòng kiểm tra hộp thư của bạn.',
+          'Success',
+          'Password reset email has been sent. Please check your email.',
           [
             {
               text: 'OK',
@@ -63,11 +63,11 @@ const ForgotPassword = () => {
           ]
         );
       } else {
-        Alert.alert('Lỗi', data.message || 'Có lỗi xảy ra. Vui lòng thử lại.');
+        Alert.alert('Error', data.message || 'An error occurred. Please try again.');
       }
     } catch (error) {
       console.error('Forgot password error:', error);
-      Alert.alert('Lỗi', 'Không thể kết nối đến máy chủ. Vui lòng thử lại.');
+      Alert.alert('Error', 'Could not connect to server. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -98,9 +98,9 @@ const ForgotPassword = () => {
             
             <View style={styles.headerContent}>
               <FontAwesome name="lock" size={60} color="#FFFFFF" />
-              <Text style={styles.headerTitle}>Quên mật khẩu</Text>
+              <Text style={styles.headerTitle}>Forgot Password</Text>
               <Text style={styles.headerSubtitle}>
-                Nhập email của bạn để nhận link đặt lại mật khẩu
+                Enter your email to receive a password reset link
               </Text>
             </View>
           </LinearGradient>
@@ -110,7 +110,7 @@ const ForgotPassword = () => {
               <FontAwesome name="envelope" size={20} color="#90A4AE" style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
-                placeholder="Nhập email của bạn"
+                placeholder="Enter your email"
                 value={email}
                 onChangeText={setEmail}
                 keyboardType="email-address"
@@ -128,7 +128,7 @@ const ForgotPassword = () => {
               {loading ? (
                 <ActivityIndicator color="#FFFFFF" size="small" />
               ) : (
-                <Text style={styles.submitButtonText}>Gửi email đặt lại mật khẩu</Text>
+                <Text style={styles.submitButtonText}>Send password reset email</Text>
               )}
             </TouchableOpacity>
 
@@ -137,7 +137,7 @@ const ForgotPassword = () => {
               onPress={handleBackToLogin}
             >
               <Text style={styles.backToLoginText}>
-                ← Quay lại đăng nhập
+                ← Back to login
               </Text>
             </TouchableOpacity>
 
@@ -145,7 +145,7 @@ const ForgotPassword = () => {
               <View style={styles.successMessage}>
                 <FontAwesome name="check-circle" size={20} color="#4CAF50" />
                 <Text style={styles.successText}>
-                  Email đã được gửi thành công!
+                  Email has been sent successfully!
                 </Text>
               </View>
             )}

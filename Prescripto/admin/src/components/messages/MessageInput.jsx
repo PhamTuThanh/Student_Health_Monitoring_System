@@ -29,7 +29,7 @@ const MessageInput = () => {
 				<button
 					type="button"
 					className='flex-shrink-0 p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors duration-200'
-					title="Đính kèm file"
+					title="Attach file"
 				>
 					<MdAttachFile className='w-5 h-5' />
 				</button>
@@ -41,7 +41,7 @@ const MessageInput = () => {
 							value={message}
 							onChange={(e) => setMessage(e.target.value)}
 							onKeyPress={handleKeyPress}
-							placeholder='Nhập tin nhắn...'
+							placeholder='Enter message...'
 							rows={1}
 							className='flex-1 bg-transparent border-none outline-none resize-none text-gray-800 placeholder-gray-500 text-sm leading-6 max-h-32 overflow-y-auto'
 							style={{
@@ -77,7 +77,7 @@ const MessageInput = () => {
 							: 'bg-gray-200 text-gray-400 cursor-not-allowed'
 						}
 					`}
-					title="Gửi tin nhắn"
+							title="Send message"
 				>
 					{loading ? (
 						<div className='w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin'></div>
@@ -88,11 +88,11 @@ const MessageInput = () => {
 			</form>
 
 			{/* Typing indicator hoặc hints */}
-			<div className='mt-2 px-4'>
+			{/* <div className='mt-2 px-4'>
 				<p className='text-xs text-gray-400'>
 					Nhấn Enter để gửi, Shift + Enter để xuống dòng
 				</p>
-			</div>
+			</div> */}
 
 			{/* Custom styles */}
 			<style >{`

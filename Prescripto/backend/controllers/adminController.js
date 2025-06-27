@@ -10,6 +10,7 @@ import xlsx from 'xlsx';
 import News from '../models/newsModel.js';
 import ExamSession from "../models/examSessionModel.js";
 import physicalFitnessModel from "../models/physicalFitnessModel.js";
+// import { normalizeCohort } from '../utils/normalize.js';
 
 
 //API for adding doctor
@@ -53,7 +54,7 @@ const addDoctor = async (req, res) => {
             fees,
             address: JSON.parse(address),
             date: Date.now(),
-            role: 'doctor' // Explicitly set role for doctor
+            role: 'doctor'
         };
         const newDoctor = new doctorModel(doctorData);
         await newDoctor.save();
@@ -67,7 +68,7 @@ const addDoctor = async (req, res) => {
 //API for adding student (now uses userModel)
 const addStudent = async (req, res) => {
     try {
-        const { name, email, password, cohort, studentId, major, about, dob, gender, address } = req.body;
+        const { name, email, password, phone, cohort, studentId, major, about, dob, gender, address } = req.body;
         const imageFile = req.file;
         console.log('req.body:', req.body);
         console.log('req.file:', req.file);
@@ -108,6 +109,7 @@ const addStudent = async (req, res) => {
             email,
             image: imageUrl,
             password: hashedPassword,
+            phone,
             cohort,
             studentId,
             major,
@@ -128,48 +130,48 @@ const addStudent = async (req, res) => {
 }
 
 //API For admin login
-    const loginAdmin = async (req, res) =>{
-        try{
-            const {email, password} = req.body;
-            // Consider storing admin credentials more securely if this is for a real application
-            if(email === process.env.ADMIN_EMAIL && password === process.env.ADMIN_PASSWORD){
-                const token = jwt.sign({email: email, role: 'admin'}, process.env.JWT_SECRET, { expiresIn: '1d' });
-                
-                res.cookie('aToken', token, {
-                    httpOnly: true,
-                    secure: process.env.NODE_ENV === 'production',
-                    sameSite: 'strict',
-                    maxAge: 24 * 60 * 60 * 1000 // 1 day
-                });
+const loginAdmin = async (req, res) =>{
+    try{
+        const {email, password} = req.body;
+        // Consider storing admin credentials more securely if this is for a real application
+        if(email === process.env.ADMIN_EMAIL && password === process.env.ADMIN_PASSWORD){
+            const token = jwt.sign({email: email, role: 'admin'}, process.env.JWT_SECRET, { expiresIn: '1d' });
+            
+            res.cookie('aToken', token, {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === 'production',
+                sameSite: 'strict',
+                maxAge: 24 * 60 * 60 * 1000 // 1 day
+            });
 
-                res.status(200).json({
-                    success: true,
-                    message: 'Admin logged in successfully',
-                    token: token
-                });
+            res.status(200).json({
+                success: true,
+                message: 'Admin logged in successfully',
+                token: token
+            });
 
-            } else {
-                res.json({success:false, message: "Please try login again"});
-            }
-
-        }catch (error){
-            console.log(error);
-            res.json({success:false, message:error.message});
+        } else {
+            res.json({success:false, message: "Please try login again"});
         }
+
+    }catch (error){
+        console.log(error);
+        res.json({success:false, message:error.message});
     }
+}
 //API for admin logout
 const logoutAdmin = async (req, res) => {
-    try {
-        res.clearCookie('aToken', {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'strict',
-        });
-        res.status(200).json({ success: true, message: "Logged out successfully" });
-    } catch (error) {
-        console.log(error);
-        res.status(500).json({ success: false, message: "Logout failed" });
-    }
+try {
+    res.clearCookie('aToken', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+    });
+    res.status(200).json({ success: true, message: "Logged out successfully" });
+} catch (error) {
+    console.log(error);
+    res.status(500).json({ success: false, message: "Logout failed" });
+}
 }
 //API to get all doctor list for admin panel
     const allDoctors = async(req, res) => {
@@ -256,11 +258,16 @@ const deleteDoctor = async (req, res) => {
 //--------------------Student Management--------------------
 const listStudents = async (req, res) => {
     try {
-        const { cohort, major } = req.body;
+        const { cohort, major, studentId } = req.body;
         let query = { role: 'student' }; // Filter by role student
+        
         if (cohort) query.cohort = cohort;
         if (major) query.major = major;
-        // If no cohort or major, find all students 
+        if (studentId && studentId.trim() !== '') {
+            // Use regex for partial matching (case-insensitive)
+            query.studentId = { $regex: studentId.trim(), $options: 'i' };
+        }
+        
         const students = await userModel.find(query).select('-password');
         res.json({ success: true, students });
     } catch (error) {
@@ -294,15 +301,17 @@ const importStudentsExcel = async (req, res) => {
       }
 
       const hashedPassword = await bcrypt.hash(row.password ? row.password.toString() : '12345678', 10);
+    //   const cohort = row.cohort ? normalizeCohort(row.cohort) : "";
       studentsToInsert.push({
         name: row.name,
         email: row.email,
         password: hashedPassword,
+        phone: row.phone || '0000000000',
         cohort: row.cohort,
         studentId: row.studentId ? row.studentId.toString() : undefined,
         major: row.major,
         about: row.about,
-        dob: row.dob, // Consider date validation/formatting
+        dob: row.dob, 
         gender: row.gender,
         address: {
           line1: row.address_line1 || '',
@@ -439,4 +448,35 @@ const createExamSession = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
-export { addDoctor, loginAdmin, logoutAdmin, allDoctors, appoinmentsAdmin, appoinmentCancel, adminDashboard, deleteDoctor, addStudent, listStudents, importStudentsExcel, addNews, getNews, updateNews, deleteNews, createExamSession };
+const examtionList = async (req, res) => {
+    try {
+        const examSessions = await ExamSession.find({});
+        res.json({ success: true, examSessions });
+    } catch (error) {
+        console.log(error);
+        res.json({ success: false, message: error.message });
+    }
+}
+
+const deleteStudent = async (req, res) => {
+    try {
+        const { id } = req.params;
+        
+        if (!id) {
+            return res.status(400).json({ success: false, message: "Student ID is required" });
+        }
+
+        const deletedStudent = await userModel.findByIdAndDelete(id);
+        
+        if (!deletedStudent) {
+            return res.status(404).json({ success: false, message: "Student not found" });
+        }
+
+        res.status(200).json({ success: true, message: "Student deleted successfully" });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+export { addDoctor, loginAdmin, logoutAdmin, allDoctors, appoinmentsAdmin, appoinmentCancel, adminDashboard, deleteDoctor, addStudent, listStudents, importStudentsExcel, addNews, getNews, updateNews, deleteNews, createExamSession, deleteStudent };

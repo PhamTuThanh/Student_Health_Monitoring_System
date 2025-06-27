@@ -57,22 +57,22 @@ const Announcements: FC = () => {
     high: {
       colors: ['#ff6b6b', '#ee5a52'] as const,
       icon: 'warning',
-      label: 'KHẨN CẤP'
+      label: 'URGENT'
     },
     medium: {
       colors: ['#ffd93d', '#ffcd02'] as const,
       icon: 'info',
-      label: 'QUAN TRỌNG'
+      label: 'IMPORTANT'
     },
     low: {
       colors: ['#6bcf7f', '#4CAF50'] as const,
       icon: 'check-circle',
-      label: 'THÔNG TIN'
+      label: 'INFORMATION'
     },
     default: {
       colors: ['#74b9ff', '#0984e3'] as const,
       icon: 'info',
-      label: 'THÔNG BÁO'
+      label: 'ANNOUNCEMENT'
     }
   }), []);
 
@@ -103,8 +103,8 @@ const Announcements: FC = () => {
         setErrorShown(true);
       }
       Alert.alert(
-        'Lỗi',
-        'Không thể tải thông báo. Vui lòng thử lại sau.',
+        'Error',
+        'Cannot load announcements. Please try again later.',
         [{ text: 'OK' }]
       );
     } finally {
@@ -142,9 +142,9 @@ const Announcements: FC = () => {
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     
     if (diffDays === 1) {
-      return 'Hôm qua';
+      return 'Yesterday';
     } else if (diffDays < 7) {
-      return `${diffDays} ngày trước`;
+      return `${diffDays} days ago`;
     } else {
       return date.toLocaleDateString('vi-VN', {
         day: 'numeric',
@@ -198,10 +198,10 @@ const Announcements: FC = () => {
         <View style={styles.headerContent}>
           <View style={styles.headerTitleContainer}>
             <Icon name="campaign" size={32} color="#ffffff" />
-            <Text style={styles.headerTitle}>Thông Báo</Text>
+            <Text style={styles.headerTitle}>Announcements</Text>
           </View>
           <Text style={styles.headerSubtitle}>
-            {unreadCount > 0 ? `${unreadCount} thông báo chưa đọc` : 'Tất cả đã đọc'}
+            {unreadCount > 0 ? `${unreadCount} unread announcements` : 'All read'}
           </Text>
         </View>
       </LinearGradient>
@@ -288,7 +288,7 @@ const Announcements: FC = () => {
             </Text>
             
             <View style={styles.cardFooter}>
-              <Text style={styles.readMoreText}>Đọc thêm</Text>
+              <Text style={styles.readMoreText}>Read more</Text>
               <Icon name="arrow-forward-ios" size={14} color="#a0a0a0" />
             </View>
           </View>
@@ -345,7 +345,7 @@ const Announcements: FC = () => {
               >
                 <Icon name="arrow-back-ios" size={24} color="#ffffff" />
               </TouchableOpacity>
-              <Text style={styles.detailHeaderTitle}>Chi tiết</Text>
+              <Text style={styles.detailHeaderTitle}>Details</Text>
               <View style={styles.headerSpacer} />
             </View>
           </SafeAreaView>
@@ -402,7 +402,7 @@ const Announcements: FC = () => {
           style={styles.loadingGradient}
         >
           <ActivityIndicator size="large" color="#ffffff" />
-          <Text style={styles.loadingText}>Đang tải thông báo...</Text>
+          <Text style={styles.loadingText}>Loading announcements...</Text>
         </LinearGradient>
       </View>
     );
@@ -415,10 +415,10 @@ const Announcements: FC = () => {
         <StatusBar barStyle="light-content" backgroundColor="#667eea" />
         <View style={styles.emptyContainer}>
           <Icon name="notifications-none" size={80} color="#ccc" />
-          <Text style={styles.emptyTitle}>Chưa có thông báo</Text>
-          <Text style={styles.emptySubtitle}>Các thông báo mới sẽ hiển thị tại đây</Text>
+            <Text style={styles.emptyTitle}>No announcements yet</Text>
+          <Text style={styles.emptySubtitle}>New announcements will be displayed here</Text>
           <TouchableOpacity style={styles.refreshButton} onPress={fetchAnnouncements}>
-            <Text style={styles.refreshButtonText}>Làm mới</Text>
+            <Text style={styles.refreshButtonText}>Refresh</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -576,6 +576,7 @@ const styles = StyleSheet.create({
     marginRight: 4,
   },
   detailContainer: {
+    
     flex: 1,
     backgroundColor: '#f8f9fa',
   },
@@ -586,7 +587,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingTop: 8,
+    paddingTop: 20,
   },
   backButton: {
     width: 40,

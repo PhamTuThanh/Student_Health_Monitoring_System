@@ -14,8 +14,14 @@ export const initializeSocket = async () => {
         if (!socket) {
             console.log("Socket connecting with token:", token);
             socket = io(BACKEND_URL, {
-                transports: ['websocket','polling'],  
-                auth: { token }
+                transports: ['websocket', 'polling'],  
+                auth: { token },
+                autoConnect: true,
+                reconnection: true,
+                reconnectionAttempts: 5,
+                reconnectionDelay: 1000,
+                reconnectionDelayMax: 5000,
+                timeout: 20000
             });
 
             socket.on("connect", () => {

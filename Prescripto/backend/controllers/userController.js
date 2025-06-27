@@ -605,4 +605,89 @@ const getAnnouncements = async (req, res) => {
     }
 }
 
-export { registerUser, loginUser, getProfile, updateProfile, bookAppoinment, listAppoinment, cancelAppoinment, createPayPalPayment,handlePayPalSuccess,handlePayPalCancel, sendEmail, getUsersForChat, getDoctorsForChat, getPhysicalData, saveChatHistory, getChatHistory, getAnnouncements, forgotPassword, changePassword };
+const getHealthScores = async (req, res) => {
+    try {
+        const { studentId } = req.params;
+        
+        // Get the latest physical fitness data for the student
+        const physicalData = await physicalFitnessModel.findOne({ studentId }).sort({ createdAt: -1 });
+        
+        if (!physicalData) {
+            return res.json({
+                success: true,
+                data: {
+                    physicalFitness: 0,
+                    cardiovascular: 0,
+                    respiratory: 0,
+                    mental: 0,
+                    overall: 0
+                }
+            });
+        }
+
+        // Calculate health scores based on physical data
+        let physicalFitness = 70; // Base score
+        let cardiovascular = 70;
+        let respiratory = 70;
+        let mental = 75;
+
+        // BMI scoring
+        if (physicalData.danhGiaBMI === 'BT') physicalFitness += 15;
+        else if (physicalData.danhGiaBMI === 'TC') physicalFitness += 10;
+        else if (physicalData.danhGiaBMI === 'G') physicalFitness += 5;
+
+        // Blood pressure scoring
+        if (physicalData.danhGiaTTH === 'HABT') cardiovascular += 20;
+        else if (physicalData.danhGiaTTH === 'HAT') cardiovascular += 15;
+        else if (physicalData.danhGiaTTH === 'HAC') cardiovascular -= 10;
+
+        // Heart rate scoring
+        if (physicalData.danhGiaHeartRate === 'NTBT') {
+            cardiovascular += 10;
+            respiratory += 20;
+        } else if (physicalData.danhGiaHeartRate === 'NTT') {
+            cardiovascular += 5;
+            respiratory += 10;
+        } else if (physicalData.danhGiaHeartRate === 'NTC') {
+            cardiovascular -= 5;
+            respiratory -= 10;
+        }
+
+        // Height and weight scoring
+        if (physicalData.danhGiaCC === 'BT') physicalFitness += 10;
+        if (physicalData.danhGiaCN === 'BT') physicalFitness += 10;
+
+        // Mental health estimation based on overall physical health
+        const avgPhysical = (physicalFitness + cardiovascular + respiratory) / 3;
+        mental = Math.min(95, Math.max(60, avgPhysical - 5 + Math.random() * 10));
+
+        // Ensure scores don't exceed 100 or go below 0
+        physicalFitness = Math.min(100, Math.max(0, physicalFitness));
+        cardiovascular = Math.min(100, Math.max(0, cardiovascular));
+        respiratory = Math.min(100, Math.max(0, respiratory));
+        mental = Math.min(100, Math.max(0, mental));
+
+        const overall = Math.round((physicalFitness + cardiovascular + respiratory + mental) / 4);
+
+        res.json({
+            success: true,
+            data: {
+                physicalFitness: Math.round(physicalFitness),
+                cardiovascular: Math.round(cardiovascular),
+                respiratory: Math.round(respiratory),
+                mental: Math.round(mental),
+                overall
+            }
+        });
+
+    } catch (error) {
+        console.error('Error getting health scores:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error getting health scores',
+            error: error.message
+        });
+    }
+};
+
+export { registerUser, loginUser, getProfile, updateProfile, bookAppoinment, listAppoinment, cancelAppoinment, createPayPalPayment,handlePayPalSuccess,handlePayPalCancel, sendEmail, getUsersForChat, getDoctorsForChat, getPhysicalData, saveChatHistory, getChatHistory, getAnnouncements, forgotPassword, changePassword, getHealthScores };

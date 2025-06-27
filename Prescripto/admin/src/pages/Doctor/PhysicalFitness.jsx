@@ -305,21 +305,21 @@ export default function PhysicalFitness() {
         }
       );
       if (response.data.success) {
-        const { summary, duplicates, invalidRows } = response.data;
+        const { summary, updated, invalidRows } = response.data;
         let message = `Import completed!\n`;
         message += `Total rows: ${summary.totalRows}\n`;
         message += `Valid rows: ${summary.validRows}\n`;
-        message += `Inserted: ${summary.insertedCount}\n`;
-        message += `Duplicates: ${summary.duplicateCount}\n`;
-        message += `Skipped: ${summary.skippedCount}`;
-        if (duplicates && duplicates.length > 0) {
-          message += `\n\nDuplicate student IDs: ${duplicates.join(', ')}`;
+        message += `New records inserted: ${summary.insertedCount}\n`;
+        message += `Existing records updated: ${summary.updatedCount}\n`;
+        message += `Skipped (invalid): ${summary.skippedCount}`;
+        if (updated && updated.length > 0) {
+          message += `\n\nUpdated student IDs: ${updated.join(', ')}`;
         }
         if (invalidRows && invalidRows.length > 0) {
           message += `\n\nInvalid rows: ${invalidRows.map(r => `Row ${r.row} (${r.studentId})`).join(', ')}`;
         }
         toast.success(message);
-        if (summary.insertedCount > 0) {
+        if (summary.insertedCount > 0 || summary.updatedCount > 0) {
           await refreshData();
         }
       } else {
@@ -457,7 +457,7 @@ export default function PhysicalFitness() {
               onChange={(e) => setExamSessionId(e.target.value)}
               className="border rounded px-3 py-1.5 min-w-[120px]"
             >
-                {examSessions.length === 0 && <option value="">Không có kỳ thi</option>}
+                {examSessions.length === 0 && <option value="">No exam session</option>}
                 {examSessions.length > 0 && examSessions.map(session => (
                   <option key={session._id} value={session._id}>{session.examSessionAcademicYear} </option>
                 ))}
@@ -562,7 +562,10 @@ export default function PhysicalFitness() {
                         type="number"
                         className="w-[80px] border rounded px-2 py-1"
                         value={row.height}
-                        onChange={(e) => handleChange(row._id, "height", e.target.value)}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          handleChange(row._id, "height", Number(value) < 0 ? 0 : value);
+                        }}
                       />
                     </td>
                     <td className="text-center align-middle py-2 border-r border-[#eee]">{row.zScoreCC}</td>
@@ -572,7 +575,10 @@ export default function PhysicalFitness() {
                         type="number"
                         className="w-[80px] border rounded px-2 py-1"
                         value={row.weight}
-                        onChange={(e) => handleChange(row._id, "weight", e.target.value)}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          handleChange(row._id, "weight", Number(value) < 0 ? 0 : value);
+                        }}
                       />
                     </td>
                     <td className="text-center align-middle py-2 border-r border-[#eee]">{row.zScoreCN}</td>
@@ -585,7 +591,10 @@ export default function PhysicalFitness() {
                         type="number"
                         className="w-[70px] border rounded px-2 py-1"
                         value={row.systolic}
-                        onChange={(e) => handleChange(row._id, "systolic", e.target.value)}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          handleChange(row._id, "systolic", Number(value) < 0 ? 0 : value);
+                        }}
                       />
                     </td>
                     <td className="text-center align-middle py-2 border-r border-[#eee]">
@@ -593,7 +602,10 @@ export default function PhysicalFitness() {
                         type="number"
                         className="w-[70px] border rounded px-2 py-1"
                         value={row.diastolic}
-                        onChange={(e) => handleChange(row._id, "diastolic", e.target.value)}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          handleChange(row._id, "diastolic", Number(value) < 0 ? 0 : value);
+                        }}
                       />
                     </td>
                     <td className="text-center align-middle py-2 border-r border-[#eee]">{row.danhGiaTTH}</td>
@@ -602,7 +614,10 @@ export default function PhysicalFitness() {
                         type="number"
                         className="w-[70px] border rounded px-2 py-1"
                         value={row.heartRate}
-                        onChange={(e) => handleChange(row._id, "heartRate", e.target.value)}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          handleChange(row._id, "heartRate", Number(value) < 0 ? 0 : value);
+                        }}
                       />
                     </td>
                     <td className="text-center align-middle py-2 border-r border-[#eee]">{row.danhGiaHeartRate}</td>

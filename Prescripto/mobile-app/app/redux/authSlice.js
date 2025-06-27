@@ -36,6 +36,9 @@ const authSlice = createSlice({
       AsyncStorage.removeItem("userInfo")
         .then(() => console.log("User info removed from storage"))
         .catch(error => console.error("Failed to remove user info:", error));
+      AsyncStorage.removeItem("token")
+        .then(() => console.log("Token removed from storage"))
+        .catch(error => console.error("Failed to remove token:", error));
     },
     setUser: (state, action) => {
       console.log("Setting user in state:", action.payload);

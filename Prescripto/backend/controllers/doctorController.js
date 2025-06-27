@@ -12,6 +12,7 @@ import cloudinary from 'cloudinary';
 import examSessionModel from '../models/examSessionModel.js';
 import mongoose from 'mongoose';
 import prescriptionModel from '../models/prescriptionModel.js';
+import { normalizeCohort } from '../utils/normalize.js';
 
 const changeAvailability = async (req, res) => {
     try {
@@ -67,6 +68,7 @@ const loginDoctor = async (req, res)=>{
         res.status(500).json({ success: false, message: 'Internal server error' });
     }
 }
+
 
 const logoutDoctor = (req, res) => {
     try {
@@ -260,7 +262,9 @@ const savePhysicalFitness = async (req, res) => {
         if (!studentId || !examSessionId) {
             return res.status(400).json({ success: false, message: "Student ID and Exam Session ID are required." });
         }
-
+        if(data.cohort){
+            data.cohort = normalizeCohort(data.cohort);
+        }
         const fitnessData = await physicalFitnessModel.findOneAndUpdate(
             { studentId: studentId, examSessionId: examSessionId }, // Query to find the document
             { $set: data }, // Data to update
@@ -292,10 +296,7 @@ const getPhysicalFitnessStatus = async (req, res) => {
         if(examSessionId){
             filter.examSessionId = examSessionId;
         }
-        if(cohort){
-            filter.cohort = cohort;
-        }else{
-            filter.examSessionId = examSessionId;
+        if(cohort && cohort !== "All" && cohort !== ""){
             filter.cohort = cohort;
         }
         const data = await physicalFitnessModel.find(filter);
@@ -359,12 +360,12 @@ const getPhysicalFitnessStatus = async (req, res) => {
       }
   
       // Validate required fields
-      const requiredFields = ['studentId', 'height', 'weight'];
+      const requiredFields = ['studentId'];
       const invalidRows = [];
       const validData = [];
   
       data.forEach((row, index) => {
-        const missingFields = requiredFields.filter(field => !row[field]);
+        const missingFields = requiredFields.filter(field => !row[field] && row[field] !== 0);
         if (missingFields.length > 0) {
           invalidRows.push({
             row: index + 1,
@@ -376,74 +377,85 @@ const getPhysicalFitnessStatus = async (req, res) => {
         }
       });
   
-      if (invalidRows.length > 0) {
-        return res.status(400).json({
-          success: false,
-          message: 'Some rows are missing required fields',
-          invalidRows
-        });
-      }
+      // Note: We'll still process rows with missing optional fields, but with warnings
   
-      // Check for duplicates and prepare data
-      const processedData = [];
-      const duplicateStudentIds = [];
+            // Process data and handle upsert (insert or update)
       const existingRecords = await physicalFitnessModel.find({ examSessionId });
+      let insertedCount = 0;
+      let updatedCount = 0;
+      const updatedStudentIds = [];
   
       for (const row of validData) {
         const studentId = String(row.studentId).replace(/^['"]+|['"]+$/g, '').trim();
         
-        // Check if record already exists
-        const existingRecord = existingRecords.find(record => 
-          String(record.studentId) === studentId
-        );
-  
-        if (existingRecord) {
-          duplicateStudentIds.push(studentId);
-          continue;
-        }
-  
-        // Calculate derived fields
-        const height = parseFloat(row.height) || 0;
-        const weight = parseFloat(row.weight) || 0;
-        const systolic = parseFloat(row.systolic) || 0;
-        const diastolic = parseFloat(row.diastolic) || 0;
-        const heartRate = parseFloat(row.heartRate) || 0;
+        // Calculate derived fields - use 0 as default for empty numeric fields
+        const height = row.height !== undefined && row.height !== null && row.height !== "" ? parseFloat(row.height) || 0 : 0;
+        const weight = row.weight !== undefined && row.weight !== null && row.weight !== "" ? parseFloat(row.weight) || 0 : 0;
+        const systolic = row.systolic !== undefined && row.systolic !== null && row.systolic !== "" ? parseFloat(row.systolic) || 0 : 0;
+        const diastolic = row.diastolic !== undefined && row.diastolic !== null && row.diastolic !== "" ? parseFloat(row.diastolic) || 0 : 0;
+        const heartRate = row.heartRate !== undefined && row.heartRate !== null && row.heartRate !== "" ? parseFloat(row.heartRate) || 0 : 0;
   
         const zScoreCC = calculateZScoreCC(height);
         const zScoreCN = calculateZScoreCN(weight);
         const bmi = calculateBMI(weight, height);
-        const zScoreCNCc = (zScoreCN && zScoreCC) 
+        const zScoreCNCc = (zScoreCN && zScoreCC && parseFloat(zScoreCN) !== 0 && parseFloat(zScoreCC) !== 0) 
           ? (parseFloat(zScoreCN) - parseFloat(zScoreCC)).toFixed(2) 
           : "";
-  
-        processedData.push({
+        const cohort = row.cohort ? normalizeCohort(row.cohort) : "";
+
+        const updateData = {
           studentId,
           examSessionId,
-          cohort: row.cohort || "",
+          cohort,
           gender: row.gender || "",
           followDate: row.followDate || "",
           height,
           weight,
           zScoreCC,
-          danhGiaCC: getDanhGiaCC(zScoreCC),
+          danhGiaCC: height > 0 ? getDanhGiaCC(zScoreCC) : "",
           zScoreCN,
-          danhGiaCN: getDanhGiaCN(zScoreCN),
+          danhGiaCN: weight > 0 ? getDanhGiaCN(zScoreCN) : "",
           zScoreCNCc,
           bmi,
-          danhGiaBMI: getDanhGiaBMI(bmi),
+          danhGiaBMI: (weight > 0 && height > 0) ? getDanhGiaBMI(bmi) : "",
           systolic,
           diastolic,
-          danhGiaTTH: getDanhGiaTTH(systolic, diastolic),
+          danhGiaTTH: (systolic > 0 && diastolic > 0) ? getDanhGiaTTH(systolic, diastolic) : "",
           heartRate,
-          danhGiaHeartRate: getDanhGiaHeartRate(heartRate),
-        });
-      }
-  
-      // Insert new records
-      let insertedCount = 0;
-      if (processedData.length > 0) {
-        const result = await physicalFitnessModel.insertMany(processedData);
-        insertedCount = result.length;
+          danhGiaHeartRate: heartRate > 0 ? getDanhGiaHeartRate(heartRate) : "",
+        };
+
+        // Check if record already exists
+        const existingRecord = existingRecords.find(record => 
+          String(record.studentId) === studentId
+        );
+
+        if (existingRecord) {
+          // Update existing record - update all fields including 0 values for numeric fields
+          const fieldsToUpdate = {};
+          const numericFields = ['height', 'weight', 'systolic', 'diastolic', 'heartRate', 'bmi', 'zScoreCC', 'zScoreCN', 'zScoreCNCc'];
+          const evaluationFields = ['danhGiaCC', 'danhGiaCN', 'danhGiaBMI', 'danhGiaTTH', 'danhGiaHeartRate'];
+          
+                      Object.keys(updateData).forEach(key => {
+              if (key === 'studentId' || key === 'examSessionId') {
+                fieldsToUpdate[key] = updateData[key];
+              } else if (numericFields.includes(key) || evaluationFields.includes(key)) {
+                // Always update numeric and evaluation fields, even if they are 0 or empty
+                fieldsToUpdate[key] = updateData[key];
+              } else if (updateData[key] !== "" && updateData[key] !== null && updateData[key] !== undefined) {
+                // For other fields, only update if they have data
+                fieldsToUpdate[key] = updateData[key];
+              }
+            });
+          
+          await physicalFitnessModel.findByIdAndUpdate(existingRecord._id, fieldsToUpdate);
+          updatedCount++;
+          updatedStudentIds.push(studentId);
+        } else {
+          // Insert new record
+          await physicalFitnessModel.create(updateData);
+          insertedCount++;
+        }
       }
   
       // Clean up uploaded file
@@ -460,13 +472,13 @@ const getPhysicalFitnessStatus = async (req, res) => {
           totalRows: data.length,
           validRows: validData.length,
           insertedCount,
-          duplicateCount: duplicateStudentIds.length,
+          updatedCount,
           skippedCount: invalidRows.length
         }
       };
   
-      if (duplicateStudentIds.length > 0) {
-        response.duplicates = duplicateStudentIds;
+      if (updatedStudentIds.length > 0) {
+        response.updated = updatedStudentIds;
       }
   
       if (invalidRows.length > 0) {
@@ -525,6 +537,19 @@ const getAbnormalityByStudentId = async (req, res) => {
             return res.status(404).json({ success: false, message: 'No abnormalities found for this student' });
         }
         res.status(200).json({ success: true, data: abnormalities });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+};
+
+const deleteAbnormality = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const deletedAbnormality = await Abnormality.findByIdAndDelete(id);
+        if (!deletedAbnormality) {
+            return res.status(404).json({ success: false, message: 'Abnormality not found' });
+        }
+        res.status(200).json({ success: true, message: 'Abnormality deleted successfully' });
     } catch (error) {
         res.status(500).json({ success: false, message: 'Server error' });
     }
@@ -768,7 +793,7 @@ const addPrescription = async (req, res) => {
             }
             // Simple validation: assumes 1 unit per dosage.
             // You might need more complex logic here based on your dosage string (e.g., "2 tablets").
-            const quantityToPrescribe = 1; 
+            const quantityToPrescribe = Number(med.quantity) || 1; 
             if (drug.inventoryQuantity < quantityToPrescribe) {
                 return res.status(400).json({ success: false, message: `Not enough stock for ${drug.drugName}. Only ${drug.inventoryQuantity} left.` });
             }
@@ -788,7 +813,7 @@ const addPrescription = async (req, res) => {
 
         // --- Update Stock ---
         for (const med of medicines) {
-            const quantityToPrescribe = 1; // Corresponds to the logic above
+            const quantityToPrescribe = Number(med.quantity) || 1; // Corresponds to the logic above
             await drugStockModel.findByIdAndUpdate(med.drugId, {
                 $inc: { inventoryQuantity: -quantityToPrescribe }
             });
@@ -801,6 +826,25 @@ const addPrescription = async (req, res) => {
         res.status(500).json({ success: false, message: 'Server Error: ' + error.message });
     }
 };
+const getPrescriptionByStudentId = async (req, res) => {
+    try {
+        const { studentId } = req.params;
+        const prescriptions = await prescriptionModel.find({ studentId }).populate('medicines.drugId', 'drugName drugCode drugUnit');
+        res.status(200).json({ success: true, data: prescriptions });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Server Error: ' + error.message });
+    }
+};
+
+const getPrescriptionByAbnormalityId = async (req, res) => {
+    try {
+        const { abnormalityId } = req.params;
+        const prescriptions = await prescriptionModel.find({ abnormalityId }).populate('medicines.drugId', 'drugName drugCode drugUnit');
+        res.status(200).json({ success: true, data: prescriptions });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Server Error: ' + error.message });
+    }
+};
 
 export {
     changeAvailability, doctorList, loginDoctor, appoinmentsDoctor,
@@ -808,11 +852,13 @@ export {
     updateDoctorProfile, refundStatus, savePhysicalFitness,
     getAllPhysicalFitness, getPhysicalFitnessStatus, importPhysicalFitnessExcel,
     getAllAbnormality, createAbnormality, getAbnormalityByStudentId,
+    deleteAbnormality,
     addDrug, importDrugExcel, getDrugStock, deleteDrug, updateDrug,
     getUsersForChat,
     getPhysicalFitnessBySession,
     getListExamSession,
     logoutDoctor,
-    addPrescription
+    addPrescription,
+    getPrescriptionByStudentId, getPrescriptionByAbnormalityId
 }
 

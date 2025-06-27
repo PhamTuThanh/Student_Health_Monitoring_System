@@ -112,7 +112,7 @@ const Messages = () => {
     (async () => {
       const { status } = await Notifications.getPermissionsAsync();
       if (status !== 'granted') {
-        console.log("gửi thông báo", message);
+        console.log("sent notification", message);
         await Notifications.requestPermissionsAsync();
       }
     })();
@@ -123,11 +123,11 @@ const Messages = () => {
     const handleNewMessage = (message: Message) => {
       // Nếu không phải đang chat với người gửi, gửi notification
       if (!selectedDoctor || message.senderId !== selectedDoctor._id) {
-        console.log("gửi thông báo", message);
+          console.log("sent notification", message);
         Notifications.scheduleNotificationAsync({
           content: {
-            title: 'Tin nhắn mới',
-            body: message.text || message.message || message.content || 'Bạn có tin nhắn mới!',
+            title: 'New message',
+            body: message.text || message.message || message.content || 'You have a new message!',
             data: { senderId: message.senderId },
           },
           trigger: null,
@@ -221,7 +221,7 @@ const Messages = () => {
           <Text style={styles.searchIcon}>🔍</Text>
           <TextInput
             style={styles.searchInput}
-            placeholder="Tìm kiếm bác sĩ..."
+            placeholder="Search doctor..."
             value={searchText}
             onChangeText={setSearchText}
             placeholderTextColor="#90A4AE"
@@ -237,7 +237,7 @@ const Messages = () => {
       {/* Online Users Section */}
       {onlineUsers.length > 0 && (
         <View style={styles.onlineSection}>
-          <Text style={styles.onlineSectionTitle}>Đang trực tuyến</Text>
+          <Text style={styles.onlineSectionTitle}>Online</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.onlineUsersList}>
             {doctors.filter(doctor => isDoctorOnline(doctor._id)).map((doctor) => (
               <TouchableOpacity
@@ -259,13 +259,13 @@ const Messages = () => {
       {loading && (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#2196F3" />
-          <Text style={styles.loadingText}>Đang tải danh sách bác sĩ...</Text>
+          <Text style={styles.loadingText}>Loading doctor list...</Text>
         </View>
       )}
 
       {/* Enhanced Doctors List */}
       <ScrollView style={styles.doctorsList} showsVerticalScrollIndicator={false}>
-        <Text style={styles.sectionTitle}>Tất cả cuộc trò chuyện</Text>
+        <Text style={styles.sectionTitle}>All conversations</Text>
         
         {filteredDoctors.map((doctor) => {
           const isOnline = isDoctorOnline(doctor._id);
@@ -281,14 +281,14 @@ const Messages = () => {
               <View style={styles.doctorInfo}>
                 <View style={styles.doctorHeader}>
                   <Text style={styles.doctorName} numberOfLines={1}>
-                    BS. {doctor.name}
+                    {doctor.name}
                   </Text>
-                  <Text style={styles.messageTime}>2 giờ</Text>
+                  <Text style={styles.messageTime}>2 hours</Text>
                 </View>
                 
                 <View style={styles.messagePreview}>
                   <Text style={styles.lastMessage} numberOfLines={1}>
-                    Cảm ơn bạn đã tư vấn. Tôi sẽ thực hiện theo...
+                    Thank you for your consultation. I will follow up...
                   </Text>
                   {isOnline && (
                     <View style={styles.onlineBadge}>
@@ -306,10 +306,10 @@ const Messages = () => {
           <View style={styles.emptyState}>
             <Text style={styles.emptyStateIcon}>💬</Text>
             <Text style={styles.emptyStateTitle}>
-              {searchText ? 'Không tìm thấy kết quả' : 'Chưa có cuộc trò chuyện'}
+              {searchText ? 'No results found' : 'No conversation yet'}
             </Text>
             <Text style={styles.emptyStateSubtitle}>
-              {searchText ? 'Thử tìm kiếm với từ khóa khác' : 'Bắt đầu trò chuyện với bác sĩ'}
+              {searchText ? 'Try searching with a different keyword' : 'Start a conversation with a doctor'}
             </Text>
           </View>
         )}
@@ -338,10 +338,10 @@ const Messages = () => {
             {renderAvatar(selectedDoctor!, 45)}
             <View style={styles.chatHeaderText}>
               <Text style={styles.chatHeaderName}>
-                BS. {selectedDoctor!.name}
+                {selectedDoctor!.name}
               </Text>
               <Text style={[styles.chatHeaderStatus, { color: isOnline ? '#4CAF50' : '#9E9E9E' }]}>
-                {isOnline ? 'Đang hoạt động' : 'Offline'}
+                {isOnline ? 'Active' : 'Offline'}
               </Text>
             </View>
           </View>
@@ -368,13 +368,13 @@ const Messages = () => {
             onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
           >
             <View style={styles.chatDateHeader}>
-              <Text style={styles.chatDate}>Hôm nay</Text>
+              <Text style={styles.chatDate}>Today</Text>
             </View>
             
             {messagesLoading ? (
               <View style={styles.messagesLoadingContainer}>
                 <ActivityIndicator size="small" color="#2196F3" />
-                <Text style={styles.messagesLoadingText}>Đang tải tin nhắn...</Text>
+                <Text style={styles.messagesLoadingText}>Loading messages...</Text>
               </View>
             ) : messages.length > 0 ? (
               messages.map((msg, index) => {
@@ -410,9 +410,9 @@ const Messages = () => {
             ) : (
               <View style={styles.emptyMessagesState}>
                 <Text style={styles.emptyMessagesIcon}>💬</Text>
-                <Text style={styles.emptyMessagesTitle}>Chưa có tin nhắn</Text>
+                <Text style={styles.emptyMessagesTitle}>No messages yet</Text>
                 <Text style={styles.emptyMessagesSubtitle}>
-                  Hãy bắt đầu cuộc trò chuyện với BS. {selectedDoctor!.name}
+                  Start a conversation with {selectedDoctor!.name}
                 </Text>
               </View>
             )}
@@ -429,7 +429,7 @@ const Messages = () => {
             <View style={styles.textInputContainer}>
               <TextInput
                 style={styles.textInput}
-                placeholder="Nhập tin nhắn..."
+                placeholder="Enter message..."
                 value={message}
                 onChangeText={setMessage}
                 multiline

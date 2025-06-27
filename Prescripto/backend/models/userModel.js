@@ -10,8 +10,6 @@ const userSchema = new mongoose.Schema({
     dob: {type:String, default:"Not Selected"},
     phone: {type:String, default:"0000000000"},
     role: { type: String, enum: ['student', 'doctor', 'admin', 'user'], default: 'user' },
-
-    // Student-specific fields (nếu role là 'student')
     cohort: { type: String },
     studentId: { type: String }, 
     major: { type: String },

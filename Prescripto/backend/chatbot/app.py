@@ -3,7 +3,7 @@ from flask_cors import CORS
 import json
 import re
 from datetime import datetime
-import requests
+from openai import OpenAI
 import os
 from dotenv import load_dotenv
 
@@ -14,9 +14,15 @@ app = Flask(__name__)
 CORS(app)
 
 # Get API key from environment variable
-OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY')
+OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY_DEEPSEEK')
 SITE_URL = os.getenv('SITE_URL', 'http://localhost:3000')
 SITE_NAME = os.getenv('SITE_NAME', 'Health Chatbot')
+
+# Initialize OpenAI client for OpenRouter
+client = OpenAI(
+    base_url="https://openrouter.ai/api/v1",
+    api_key=OPENROUTER_API_KEY,
+)
 
 # Health assessment rules and responses
 HEALTH_RULES = {
@@ -78,33 +84,25 @@ def analyze_health_info(message):
 
 def get_gemini_response(message):
     try:
-        response = requests.post(
-            url="https://openrouter.ai/api/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-                "Content-Type": "application/json",
+        completion = client.chat.completions.create(
+            extra_headers={
                 "HTTP-Referer": SITE_URL,
                 "X-Title": SITE_NAME,
             },
-            data=json.dumps({
-                "model": "google/gemma-3n-e4b-it:free",
-                "messages": [
-                    {
-                        "role": "user",
-                        "content": message
-                    }
-                ]
-            })
+            extra_body={},
+            model="deepseek/deepseek-r1-0528:free",
+            messages=[
+                {
+                    "role": "user",
+                    "content": message
+                }
+            ]
         )
         
-        if response.status_code == 200:
-            return response.json()['choices'][0]['message']['content']
-        else:
-            print(f"Error calling Gemini API: {response.text}")
-            return "Xin lỗi, tôi đang gặp vấn đề kỹ thuật. Vui lòng thử lại sau."
+        return completion.choices[0].message.content
             
     except Exception as e:
-        print(f"Error calling Gemini API: {str(e)}")
+        print(f"Error calling DeepSeek API: {str(e)}")
         return "Xin lỗi, đã có lỗi xảy ra khi xử lý yêu cầu của bạn."
 
 @app.route('/api/chat', methods=['POST'])

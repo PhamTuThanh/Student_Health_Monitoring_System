@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -6,14 +6,16 @@ import {
   TouchableOpacity,
   StyleSheet,
   SafeAreaView,
-  Dimensions, // Not explicitly used but kept for context if needed
+  Dimensions,
   Alert,
   Image,
+  Animated,
 } from 'react-native';
 import { assets } from '../../assets/images/assets.js';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { getInfoUser, getPhysicalData, getAbnormalData } from '../services/api/api';
+import { getInfoUser, getPhysicalData, getAbnormality, getHealthScores } from '../services/api/api';
+import { useNavigation } from '@react-navigation/native';
 
 const { width } = Dimensions.get('window'); // Kept, but not directly used in styles below
 
@@ -56,70 +58,146 @@ interface AbnormalityRecord {
   temporaryTreatment: string;
 }
 
-interface Appointment {
-  id: number;
-  date: string;
-  time: string;
-  type: string;
-  doctor: string;
-  location: string;
-}
-
 const StudentHealthDashboard: React.FC = () => {
+  const navigation = useNavigation();
   const [activeTab, setActiveTab] = useState<string>('overview'); // This state is not used in the current render logic, but kept for future use
   const [studentData, setStudentData] = useState<StudentData | null>(null);
   const [healthMetrics, setHealthMetrics] = useState<HealthMetrics | null>(null);
   const [abnormalityHistory, setAbnormalityHistory] = useState<AbnormalityRecord[]>([]);
+  const [healthScores, setHealthScores] = useState<HealthScores>({
+    physicalFitness: 0,
+    cardiovascular: 0,
+    respiratory: 0,
+    mental: 0,
+    overall: 0
+  });
   const [loading, setLoading] = useState(true);
 
+  // Animation refs
+  const spinValue = useRef(new Animated.Value(0)).current;
+  const pulseValue = useRef(new Animated.Value(1)).current;
+
   useEffect(() => {
+    if (loading) {
+      // Spinner rotation animation
+      const spinAnimation = Animated.loop(
+        Animated.timing(spinValue, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        })
+      );
+
+      // Text pulse animation
+      const pulseAnimation = Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseValue, {
+            toValue: 0.7,
+            duration: 800,
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseValue, {
+            toValue: 1,
+            duration: 800,
+            useNativeDriver: true,
+          }),
+        ])
+      );
+
+      spinAnimation.start();
+      pulseAnimation.start();
+
+      return () => {
+        spinAnimation.stop();
+        pulseAnimation.stop();
+      };
+    }
+  }, [loading]);
+
+  useEffect(() => {
+    let isMounted = true; // Prevent state updates if component unmounts
+    
     const fetchAll = async () => {
       try {
+        // Fetch user info first
         const user = await getInfoUser();
+        if (!isMounted) return;
+        
+        if (!user?.userData) {
+          throw new Error('User data not found');
+        }
+        
         setStudentData(user.userData);
-
-        const physical = await getPhysicalData(user.userData.studentId);
-        const latestPhysical = Array.isArray(physical.data) && physical.data.length > 0
-          ? physical.data[physical.data.length - 1]
-          : null;
-        setHealthMetrics(latestPhysical);
-
-        const abnormal = await getAbnormalData(user.userData.studentId);
-        setAbnormalityHistory(Array.isArray(abnormal.data) ? abnormal.data : []);
+        
+        // Only proceed if we have studentId
+        if (!user.userData.studentId) {
+          throw new Error('Student ID not found');
+        }
+  
+        // Fetch physical data
+        try {
+          const physical = await getPhysicalData(user.userData.studentId);
+          if (!isMounted) return;
+          
+          const latestPhysical = Array.isArray(physical?.data) && physical.data.length > 0
+            ? physical.data[physical.data.length - 1]
+            : null;
+          setHealthMetrics(latestPhysical);
+        } catch (physicalError) {
+          console.warn('Failed to fetch physical data:', physicalError);
+          setHealthMetrics(null);
+        }
+  
+        // Fetch abnormal data
+        try {
+          const abnormal = await getAbnormality(user.userData.studentId);
+          if (!isMounted) return;
+          
+          setAbnormalityHistory(Array.isArray(abnormal?.data) ? abnormal.data : []);
+        } catch (abnormalError) {
+          console.warn('Failed to fetch abnormal data:', abnormalError);
+          setAbnormalityHistory([]);
+        }
+  
+        // Fetch health scores
+        try {
+          const scores = await getHealthScores(user.userData.studentId);
+          if (!isMounted) return;
+          
+          if (scores?.success && scores?.data) {
+            setHealthScores(scores.data);
+          }
+        } catch (scoresError) {
+          console.warn('Failed to fetch health scores:', scoresError);
+          // Keep default scores if fetch fails
+        }
+  
       } catch (err) {
-        Alert.alert('Error', 'Failed to load data');
+        if (!isMounted) return;
+        
+        console.error('Error in fetchAll:', err);
+        Alert.alert(
+          'Error', 
+          (err as Error).message || 'Could not load data. Please try again later.',
+          [
+            { text: 'Try again', onPress: () => fetchAll() },
+            { text: 'Close', style: 'cancel' }
+          ]
+        );
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
       }
-      setLoading(false);
     };
+  
     fetchAll();
+  
+    // Cleanup function
+    return () => {
+      isMounted = false;
+    };
   }, []);
-
-  const healthScores: HealthScores = {
-    physicalFitness: 85,
-    cardiovascular: 78,
-    respiratory: 92,
-    mental: 88,
-    overall: 86
-  };
-
-  const upcomingAppointments: Appointment[] = [
-    {
-      id: 1,
-      date: '2024-07-15',
-      time: '09:00',
-      type: 'Annual Checkup',
-      doctor: 'Dr. Thanh',
-      location: 'UTC2 Health Center'
-    },
-    {
-      id: 2,
-      date: '2024-07-22',
-      time: '14:30',
-      type: 'Follow-up',
-      doctor: 'Dr. Minh',
-      location: 'UTC2 Health Center'
-    }
-  ];
 
   const getBMIStatus = (bmi: string) => {
     const bmiNum = parseFloat(bmi);
@@ -145,12 +223,18 @@ const StudentHealthDashboard: React.FC = () => {
     }
   };
 
-  const handleExportReport = () => {
-    Alert.alert('Export Report', 'Report export functionality would be implemented here');
-  };
-
-  const handleViewFullHistory = () => {
-    Alert.alert('View History', 'Full medical history would be displayed here');
+  const handleContactHealthCenter = () => {
+    Alert.alert(
+      'Contact a doctor',
+      'You will be redirected to the message page to chat with a doctor and receive health advice.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Go to messages', 
+          onPress: () => navigation.navigate('messages' as never)
+        }
+      ]
+    );
   };
 
   const renderHealthMetricCard = (
@@ -203,18 +287,213 @@ const StudentHealthDashboard: React.FC = () => {
     </View>
   );
 
+  const spin = spinValue.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
+  });
+
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
-        <Text style={{ textAlign: 'center', marginTop: 40 }}>Loading...</Text>
+        <View style={styles.loadingContainer}>
+          <Animated.View 
+            style={[
+              styles.spinner, 
+              { transform: [{ rotate: spin }] }
+            ]} 
+          />
+          <Animated.Text 
+            style={[
+              styles.loadingText, 
+              { opacity: pulseValue }
+            ]}
+          >
+            Loading data...
+          </Animated.Text>
+        </View>
       </SafeAreaView>
     );
   }
 
-  if (!studentData || !healthMetrics) {
+  if (!studentData) {
     return (
       <SafeAreaView style={styles.container}>
-        <Text style={{ textAlign: 'center', marginTop: 40 }}>No data available</Text>
+        <View style={styles.loadingContainer}>
+          <Text style={styles.loadingText}>Unable to load student data</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Trường hợp học sinh mới chưa có dữ liệu sức khỏe
+  if (!healthMetrics) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <LinearGradient
+          colors={['#EFF6FF', '#FFFFFF', '#F0FDF4']}
+          style={styles.gradient}
+        >
+          {/* Header */}
+          <View style={styles.header}>
+            <View style={styles.headerLeft}>
+              <View style={styles.logoContainer}>
+                <Image source={assets.logo_utc2} style={{width: 40, height: 40}} />
+              </View>
+              
+              <View style={styles.headerText}>
+                <Text style={styles.headerTitle}>My Health Dashboard</Text>
+                <Text style={styles.headerSubtitle}>UTC2 Health Management System</Text>
+              </View>
+            </View>
+            <View style={styles.headerRight}>
+              <TouchableOpacity style={styles.notificationButton}>
+                <Ionicons name="notifications-outline" size={20} color="#6B7280" />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.settingsButton}>
+                <Ionicons name="settings-outline" size={20} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+            {/* Welcome Card for New Student */}
+            <View style={styles.welcomeCard}>
+              <LinearGradient
+                colors={['#60A5FA', '#10B981']}
+                style={styles.welcomeGradient}
+              >
+                <View style={styles.welcomeHeader}>
+                  <Ionicons name="medical-outline" size={48} color="white" />
+                  <Text style={styles.welcomeTitle}>Welcome to UTC2!</Text>
+                  <Text style={styles.welcomeSubtitle}>
+                    Hello {studentData.name}, we haven't found any health data for you.
+                  </Text>
+                </View>
+              </LinearGradient>
+              
+              <View style={styles.welcomeContent}>
+                <Text style={styles.welcomeMessage}>
+                  To start tracking your health, you need to perform your first health check at UTC2 Health Center.
+                </Text>
+                
+                <View style={styles.instructionSteps}>
+                  <View style={styles.stepItem}>
+                    <View style={styles.stepIcon}>
+                      <Text style={styles.stepNumber}>1</Text>
+                    </View>
+                    <View style={styles.stepContent}>
+                      <Text style={styles.stepTitle}>Register for a health check</Text>
+                      <Text style={styles.stepDescription}>Contact the Health Center to schedule an appointment</Text>
+                    </View>
+                  </View>
+                  
+                  <View style={styles.stepItem}>
+                    <View style={styles.stepIcon}>
+                      <Text style={styles.stepNumber}>2</Text>
+                    </View>
+                    <View style={styles.stepContent}>
+                      <Text style={styles.stepTitle}>Perform a health check</Text>
+                      <Text style={styles.stepDescription}>Measure height, weight, blood pressure and other indicators</Text>
+                    </View>
+                  </View>
+                  
+                  <View style={styles.stepItem}>
+                    <View style={styles.stepIcon}>
+                      <Text style={styles.stepNumber}>3</Text>
+                    </View>
+                    <View style={styles.stepContent}>
+                      <Text style={styles.stepTitle}>Track results</Text>
+                      <Text style={styles.stepDescription}>Data will be updated and displayed here</Text>
+                    </View>
+                  </View>
+                </View>
+
+                <TouchableOpacity style={styles.contactButton} onPress={handleContactHealthCenter}>
+                  <Ionicons name="chatbubble-outline" size={20} color="white" />
+                  <Text style={styles.contactButtonText}>Chat with a doctor</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Student Profile Card */}
+            <View style={styles.profileCard}>
+              <View style={styles.profileHeader}>
+                <LinearGradient
+                  colors={['#60A5FA', '#10B981']}
+                  style={styles.avatar}
+                >
+                  <Text style={styles.avatarText}>{studentData?.name?.charAt(0)}</Text>
+                </LinearGradient>
+                <View style={styles.profileInfo}>
+                  <View style={styles.nameContainer}>
+                    <Text style={styles.studentName}>{studentData?.name}</Text>
+                    <View style={styles.classBadge}>
+                      <Text style={styles.classBadgeText}>{studentData?.cohort}</Text>
+                    </View>
+                  </View>
+                  <View style={styles.studentDetails}>
+                    <View style={styles.detailRow}>
+                      <Ionicons name="book-outline" size={14} color="#6B7280" />
+                      <Text style={styles.detailText}>ID: {studentData?.studentId}</Text>
+                    </View>
+                    <View style={styles.detailRow}>
+                      <Ionicons name="person-outline" size={14} color="#6B7280" />
+                      <Text style={styles.detailText}>Major: {studentData?.major}</Text>
+                    </View>
+                    <View style={styles.detailRow}>
+                      <Ionicons name="calendar-outline" size={14} color="#6B7280" />
+                      <Text style={styles.detailText}>DOB: {studentData?.dob}</Text>
+                    </View>
+                    <View style={styles.detailRow}>
+                      <Ionicons name="call-outline" size={14} color="#6B7280" />
+                      <Text style={styles.detailText}>{studentData?.phone}</Text>
+                    </View>
+                  </View>
+                </View>
+              </View>
+            </View>
+
+            {/* Info Cards */}
+            <View style={styles.infoCardsContainer}>
+              <View style={styles.infoCard}>
+                <Ionicons name="shield-checkmark-outline" size={32} color="#10B981" />
+                <Text style={styles.infoCardTitle}>Protect your health</Text>
+                <Text style={styles.infoCardDescription}>
+                  Regular monitoring helps detect health issues early
+                </Text>
+              </View>
+              
+              <View style={styles.infoCard}>
+                <Ionicons name="analytics-outline" size={32} color="#3B82F6" />
+                <Text style={styles.infoCardTitle}>Analy
+                </Text>
+              </View>
+            </View>
+
+            {/* Contact Info */}
+            <View style={styles.contactInfoCard}>
+              <View style={styles.contactHeader}>
+                <Ionicons name="medical" size={24} color="#EF4444" />
+                <Text style={styles.contactTitle}>Contact Information</Text>
+              </View>
+              <View style={styles.contactDetails}>
+                <View style={styles.contactRow}>
+                  <Ionicons name="location-outline" size={16} color="#6B7280" />
+                  <Text style={styles.contactText}>UTC2 Health Center</Text>
+                </View>
+                <View style={styles.contactRow}>
+                  <Ionicons name="call-outline" size={16} color="#6B7280" />
+                  <Text style={styles.contactText}>0123-456-789</Text>
+                </View>
+                <View style={styles.contactRow}>
+                  <Ionicons name="time-outline" size={16} color="#6B7280" />
+                  <Text style={styles.contactText}>Monday - Friday: 8:00 - 17:00</Text>
+                </View>
+              </View>
+            </View>
+
+          </ScrollView>
+        </LinearGradient>
       </SafeAreaView>
     );
   }
@@ -285,10 +564,6 @@ const StudentHealthDashboard: React.FC = () => {
                 </View>
               </View>
             </View>
-            <TouchableOpacity style={styles.exportButton} onPress={handleExportReport}>
-              <Ionicons name="download-outline" size={16} color="white" />
-              <Text style={styles.exportButtonText}>Export Report</Text>
-            </TouchableOpacity>
           </View>
 
           {/* Abnormality Card */}
@@ -379,43 +654,38 @@ const StudentHealthDashboard: React.FC = () => {
             </View>
           </View>
 
-          {/* Upcoming Appointments */}
+          {/* Regular Checkup Reminder */}
           <View style={styles.card}>
             <View style={styles.cardHeader}>
               <View style={styles.cardTitleContainer}>
                 <Ionicons name="calendar-outline" size={20} color="#374151" />
-                <Text style={styles.cardTitle}>Upcoming Appointments</Text>
+                <Text style={styles.cardTitle}>Health Checkup Reminder</Text>
               </View>
-              <TouchableOpacity>
-                <Text style={styles.viewAllText}>View All</Text>
-              </TouchableOpacity>
             </View>
-            {/* Removed "space: 16" and replaced with marginBottom where needed */}
-            <View style={styles.appointmentsContainer}>
-              {upcomingAppointments.map((appointment) => (
-                <View key={appointment.id} style={styles.appointmentCard}>
-                  <View style={styles.appointmentHeader}>
-                    <Text style={styles.appointmentType}>{appointment.type}</Text>
-                    <Text style={styles.appointmentDate}>{appointment.date}</Text>
-                  </View>
-                  {/* Removed "space: 4" and replaced with marginBottom where needed */}
-                  <View style={styles.appointmentDetails}>
-                    <View style={styles.appointmentDetail}>
-                      <Ionicons name="time-outline" size={12} color="#6B7280" />
-                      <Text style={styles.appointmentDetailText}>{appointment.time}</Text>
-                    </View>
-                    <View style={styles.appointmentDetail}>
-                      <Ionicons name="person-outline" size={12} color="#6B7280" />
-                      <Text style={styles.appointmentDetailText}>{appointment.doctor}</Text>
-                    </View>
-                    <View style={styles.appointmentDetail}>
-                      <Ionicons name="location-outline" size={12} color="#6B7280" />
-                      <Text style={styles.appointmentDetailText}>{appointment.location}</Text>
-                    </View>
-                  </View>
-                </View>
-              ))}
+            <View style={styles.reminderContainer}>
+              <View style={styles.reminderIcon}>
+                <Ionicons name="medical" size={32} color="#3B82F6" />
+              </View>
+              <View style={styles.reminderContent}>
+                <Text style={styles.reminderTitle}>Regular Health Checkup</Text>
+                <Text style={styles.reminderText}>
+                  It's recommended to have a health checkup every 6 months to maintain optimal health.
+                </Text>
+                <Text style={styles.reminderSchedule}>
+                  📅 Suggested schedule: Every 6 months
+                </Text>
+                <Text style={styles.reminderSchedule}>
+                  📍 Location: UTC2 Health Center
+                </Text>
+                <Text style={styles.reminderSchedule}>
+                  ⏰ Office hours: Monday - Friday, 8:00 - 17:00
+                </Text>
+              </View>
             </View>
+            <TouchableOpacity style={styles.reminderButton} onPress={handleContactHealthCenter}>
+              <Ionicons name="chatbubble-outline" size={16} color="white" />
+              <Text style={styles.reminderButtonText}>Contact for Appointment</Text>
+            </TouchableOpacity>
           </View>
 
           {/* Medical History */}
@@ -425,10 +695,7 @@ const StudentHealthDashboard: React.FC = () => {
                 <Ionicons name="document-text-outline" size={20} color="#374151" />
                 <Text style={styles.cardTitle}>Medical History</Text>
               </View>
-              <TouchableOpacity style={styles.viewHistoryButton} onPress={handleViewFullHistory}>
-                <Ionicons name="eye-outline" size={16} color="white" />
-                <Text style={styles.viewHistoryButtonText}>View History</Text>
-              </TouchableOpacity>
+             
             </View>
             <Text style={styles.lastCheckupText}>
               Last checkup: {healthMetrics?.followDate}
@@ -480,6 +747,35 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F8FAFC',
     marginTop: 30,
+  },
+  loadingContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+    zIndex: 50,
+  },
+  spinner: {
+    width: 64,
+    height: 64,
+    borderWidth: 4,
+    borderColor: '#93C5FD',
+    borderTopColor: 'transparent',
+    borderRadius: 32,
+    marginBottom: 16,
+    // Note: React Native doesn't have built-in CSS animations
+    // You would need to use Animated API or libraries like react-native-reanimated
+    // For now, this creates the visual structure
+  },
+  loadingText: {
+    fontSize: 18,
+    color: '#2563EB',
+    fontWeight: '600',
+    // Note: For pulse animation, you'd need to implement with Animated API
   },
   gradient: {
     flex: 1,
@@ -922,6 +1218,214 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#6B7280',
     flex: 1, // Allow text to wrap within the available space
+  },
+  welcomeCard: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    marginTop: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+    overflow: 'hidden',
+  },
+  welcomeGradient: {
+    padding: 24,
+    alignItems: 'center',
+  },
+  welcomeHeader: {
+    alignItems: 'center',
+  },
+  welcomeTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: 'white',
+    marginTop: 16,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  welcomeSubtitle: {
+    fontSize: 16,
+    color: 'rgba(255, 255, 255, 0.9)',
+    textAlign: 'center',
+    lineHeight: 22,
+  },
+  welcomeContent: {
+    padding: 24,
+  },
+  welcomeMessage: {
+    fontSize: 16,
+    color: '#374151',
+    lineHeight: 24,
+    marginBottom: 24,
+    textAlign: 'center',
+  },
+  instructionSteps: {
+    marginBottom: 24,
+  },
+  stepItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 20,
+  },
+  stepIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#3B82F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  stepNumber: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: 'white',
+  },
+  stepContent: {
+    flex: 1,
+  },
+  stepTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1F2937',
+    marginBottom: 4,
+  },
+  stepDescription: {
+    fontSize: 14,
+    color: '#6B7280',
+    lineHeight: 20,
+  },
+  contactButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#10B981',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+  contactButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  infoCardsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 20,
+  },
+  infoCard: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    padding: 20,
+    width: '48%',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  infoCardTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1F2937',
+    marginTop: 12,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  infoCardDescription: {
+    fontSize: 12,
+    color: '#6B7280',
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+  contactInfoCard: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    padding: 20,
+    marginTop: 20,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  contactHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  contactTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1F2937',
+    marginLeft: 8,
+  },
+  contactDetails: {
+    marginLeft: 32,
+  },
+  contactRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  contactText: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginLeft: 8,
+  },
+  reminderContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  reminderIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#3B82F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  reminderContent: {
+    flex: 1,
+  },
+  reminderTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1F2937',
+    marginBottom: 4,
+  },
+  reminderText: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginBottom: 8,
+  },
+  reminderSchedule: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginBottom: 8,
+  },
+  reminderButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#10B981',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+  reminderButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
   },
 });
 

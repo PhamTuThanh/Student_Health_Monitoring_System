@@ -29,11 +29,11 @@ const AddExamSession = () => {
           aToken
         }
       });
-      setMessage(res.data.message || "Tạo lần khám thành công!");
-      toast.success(res.data.message || "Tạo lần khám thành công!");
+      setMessage(res.data.message || "Create exam session successfully!");
+      toast.success(res.data.message || "Create exam session successfully!");
     setForm({ examSessionName: "", examSessionDate: "", examSessionAcademicYear: "", examSessionDescription: "" });
     } catch (err) {
-      setMessage(err.response?.data?.message || "Có lỗi xảy ra!");
+      setMessage(err.response?.data?.message || "An error occurred!");
     } finally {
       setLoading(false);
     }
@@ -41,10 +41,10 @@ const AddExamSession = () => {
 
   return (
     <div className="max-w-lg mx-auto mt-10 bg-white p-8 rounded shadow ml-10 h-[calc(100vh-4rem)] overflow-y-auto">
-      <h2 className="text-2xl font-bold mb-6 text-center">Tạo lần khám mới</h2>
+      <h2 className="text-2xl font-bold mb-6 text-center">Add exam session</h2>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="block font-semibold mb-1">Tên đợt khám</label>
+          <label className="block font-semibold mb-1">Exam session name</label>
           <input
             type="text"
             name="examSessionName"
@@ -52,11 +52,11 @@ const AddExamSession = () => {
             onChange={handleChange}
             required
             className="w-full border rounded px-3 py-2"
-            placeholder="Ví dụ: Khám sức khỏe đầu năm"
+            placeholder="Example: Health check-up at the beginning of the year"
           />
         </div>
         <div>
-          <label className="block font-semibold mb-1">Ngày khám</label>
+          <label className="block font-semibold mb-1">Exam date</label>
           <input
             type="date"
             name="examSessionDate"
@@ -67,7 +67,7 @@ const AddExamSession = () => {
           />
         </div>
         <div>
-          <label className="block font-semibold mb-1">Năm học</label>
+          <label className="block font-semibold mb-1">Academic year</label>
           <input
             type="text"
             name="examSessionAcademicYear"
@@ -75,17 +75,17 @@ const AddExamSession = () => {
             onChange={handleChange}
             required
             className="w-full border rounded px-3 py-2"
-            placeholder="Ví dụ: 2024-2025"
+            placeholder="Example: 2024-2025"
           />
         </div>
         <div>
-          <label className="block font-semibold mb-1">Mô tả (tuỳ chọn)</label>
+          <label className="block font-semibold mb-1">Description (optional)</label>
           <textarea
             name="examSessionDescription"
             value={form.examSessionDescription}
             onChange={handleChange}
             className="w-full border rounded px-3 py-2"
-            placeholder="Ghi chú thêm về đợt khám"
+            placeholder="Additional notes about the exam session"
           />
         </div>
         <button
@@ -93,7 +93,7 @@ const AddExamSession = () => {
           className="w-full bg-blue-600 text-white py-2 rounded font-semibold hover:bg-blue-700"
           disabled={loading}
         >
-          {loading ? "Đang tạo..." : "Tạo lần khám"}
+          {loading ? "Creating..." : "Create exam session"}
         </button>
       </form>
       {message && (
