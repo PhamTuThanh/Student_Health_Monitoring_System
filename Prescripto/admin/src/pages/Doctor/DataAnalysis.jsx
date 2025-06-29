@@ -197,9 +197,22 @@ const DataAnalysis = () => {
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             <select onChange={(e) => setExamSessionId(e.target.value)} value={examSessionId} className="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
               {examSessions.length === 0 && <option value="">No exam session</option>}
-              {examSessions.length > 0 && examSessions.map(session => (
-                <option key={session._id} value={session._id}>{session.examSessionAcademicYear} </option>
-              ))}
+              {examSessions.length > 0 && 
+                [...examSessions]
+                  .sort((a, b) => {
+                    const getYear = (s) => {
+                      if (s.examSessionAcademicYear) {
+                        const y = parseInt(String(s.examSessionAcademicYear).split('-')[0]);
+                        return isNaN(y) ? 0 : y;
+                      }
+                      return s.createdAt ? new Date(s.createdAt).getFullYear() : 0;
+                    };
+                    return getYear(b) - getYear(a); // Descending order (newest first)
+                  })
+                  .map(session => (
+                    <option key={session._id} value={session._id}>{session.examSessionAcademicYear}</option>
+                  ))
+              }
             </select>
             <select
               className="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"

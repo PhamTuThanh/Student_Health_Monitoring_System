@@ -82,11 +82,82 @@ const ImportExcelModal = ({ open, onClose, templateUrl, type = 'students', examS
       }
       
       const res = await axios.post(endpoint, formData, { headers });
-      toast.success(res.data.message || 'Import successful!');
+      
+      // Handle different response statuses
+      if (res.status === 200) {
+        // Complete success
+        toast.success(res.data.message || 'Import successful!');
+      } else if (res.status === 207) {
+        // Partial success with warnings/errors
+        let message = res.data.message || 'Import completed with some issues';
+        
+        if (res.data.warnings && res.data.warnings.count > 0) {
+          message += `\n⚠️ ${res.data.warnings.count} warning(s)`;
+        }
+        
+        if (res.data.errors && res.data.errors.count > 0) {
+          message += `\n❌ ${res.data.errors.count} error(s)`;
+        }
+        
+        toast.warn(message, { autoClose: 8000 });
+      }
+
+      // Show detailed results if available
+      if (res.data.summary) {
+        const { summary } = res.data;
+        console.log('Import Summary:', {
+          'Total Rows': summary.totalRows,
+          'Valid Rows': summary.validRows,
+          'Inserted': summary.insertedCount,
+          'Updated': summary.updatedCount,
+          'Errors': summary.errorCount,
+          'Warnings': summary.warningCount
+        });
+      }
+
+      // Show detailed errors in console for debugging
+      if (res.data.errors?.details) {
+        console.error('Import Errors:', res.data.errors.details);
+      }
+
+      // Show detailed warnings in console
+      if (res.data.warnings?.details) {
+        console.warn('Import Warnings:', res.data.warnings.details);
+      }
+      
       showNavbar();
       onClose(true); // Pass true to indicate success and trigger refresh
     } catch (err) {
-      toast.error('Lỗi import: ' + (err.response?.data?.message || err.message));
+      const errorData = err.response?.data;
+      let errorMessage = 'Lỗi import: ';
+      
+      if (errorData?.message) {
+        errorMessage += errorData.message;
+      } else {
+        errorMessage += err.message;
+      }
+
+      // Handle specific error cases
+      if (err.response?.status === 413) {
+        errorMessage = 'File quá lớn! Vui lòng chọn file nhỏ hơn 10MB.';
+      } else if (err.response?.status === 400 && errorData?.invalidRows) {
+        errorMessage += `\n\nChi tiết lỗi:`;
+        errorData.invalidRows.slice(0, 3).forEach(row => {
+          errorMessage += `\nDòng ${row.row}: ${row.errors?.join(', ') || 'Lỗi không xác định'}`;
+        });
+        
+        if (errorData.totalInvalidRows > 3) {
+          errorMessage += `\n... và ${errorData.totalInvalidRows - 3} lỗi khác`;
+        }
+      }
+
+      toast.error(errorMessage, { autoClose: 10000 });
+      
+      // Log detailed error info for debugging
+      if (errorData) {
+        console.error('Import Error Details:', errorData);
+      }
+      
       onClose();
     } finally {
         setLoading(false);

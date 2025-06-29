@@ -3,7 +3,7 @@ from flask_cors import CORS
 import json
 import re
 from datetime import datetime
-from openai import OpenAI
+from google import genai
 import os
 from dotenv import load_dotenv
 
@@ -14,15 +14,12 @@ app = Flask(__name__)
 CORS(app)
 
 # Get API key from environment variable
-OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY_DEEPSEEK')
+GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 SITE_URL = os.getenv('SITE_URL', 'http://localhost:3000')
 SITE_NAME = os.getenv('SITE_NAME', 'Health Chatbot')
 
-# Initialize OpenAI client for OpenRouter
-client = OpenAI(
-    base_url="https://openrouter.ai/api/v1",
-    api_key=OPENROUTER_API_KEY,
-)
+# Initialize Gemini client
+client = genai.Client(api_key=GEMINI_API_KEY)
 
 # Health assessment rules and responses
 HEALTH_RULES = {
@@ -84,25 +81,15 @@ def analyze_health_info(message):
 
 def get_gemini_response(message):
     try:
-        completion = client.chat.completions.create(
-            extra_headers={
-                "HTTP-Referer": SITE_URL,
-                "X-Title": SITE_NAME,
-            },
-            extra_body={},
-            model="deepseek/deepseek-r1-0528:free",
-            messages=[
-                {
-                    "role": "user",
-                    "content": message
-                }
-            ]
+        response = client.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=message
         )
         
-        return completion.choices[0].message.content
+        return response.text
             
     except Exception as e:
-        print(f"Error calling DeepSeek API: {str(e)}")
+        print(f"Error calling Gemini API: {str(e)}")
         return "Xin lỗi, đã có lỗi xảy ra khi xử lý yêu cầu của bạn."
 
 @app.route('/api/chat', methods=['POST'])

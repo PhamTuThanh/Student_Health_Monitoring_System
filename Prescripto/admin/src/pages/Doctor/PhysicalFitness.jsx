@@ -304,29 +304,107 @@ export default function PhysicalFitness() {
           }
         }
       );
-      if (response.data.success) {
-        const { summary, updated, invalidRows } = response.data;
-        let message = `Import completed!\n`;
-        message += `Total rows: ${summary.totalRows}\n`;
-        message += `Valid rows: ${summary.validRows}\n`;
-        message += `New records inserted: ${summary.insertedCount}\n`;
-        message += `Existing records updated: ${summary.updatedCount}\n`;
-        message += `Skipped (invalid): ${summary.skippedCount}`;
+      if (response.data.success || response.status === 207) {
+        const { summary, updated, errors, warnings } = response.data;
+        
+        // Create detailed success message
+        let message = `✅ Import completed successfully!\n\n`;
+        message += `📊 Summary:\n`;
+        message += `• Total rows processed: ${summary.totalRows}\n`;
+        message += `• Valid rows: ${summary.validRows}\n`;
+        message += `• New records created: ${summary.insertedCount}\n`;
+        message += `• Existing records updated: ${summary.updatedCount}\n`;
+        
+        if (summary.errorCount > 0) {
+          message += `• Errors: ${summary.errorCount}\n`;
+        }
+        if (summary.warningCount > 0) {
+          message += `• Warnings: ${summary.warningCount}\n`;
+        }
+
+        // Show updated student IDs (limited)
         if (updated && updated.length > 0) {
-          message += `\n\nUpdated student IDs: ${updated.join(', ')}`;
+          message += `\n📝 Updated students: ${updated.join(', ')}`;
+          if (response.data.moreUpdated) {
+            message += ` (+${response.data.moreUpdated} more)`;
+          }
         }
-        if (invalidRows && invalidRows.length > 0) {
-          message += `\n\nInvalid rows: ${invalidRows.map(r => `Row ${r.row} (${r.studentId})`).join(', ')}`;
+
+        // Show warnings if any
+        if (warnings && warnings.details && warnings.details.length > 0) {
+          message += `\n\n⚠️ Warnings (${warnings.count}):\n`;
+          warnings.details.forEach(w => {
+            message += `• Row ${w.row} (${w.studentId}): ${w.warnings.join(', ')}\n`;
+          });
+          if (warnings.hasMore) {
+            message += `... and ${warnings.count - warnings.details.length} more warnings\n`;
+          }
         }
-        toast.success(message);
+
+        // Show errors if any
+        if (errors && errors.details && errors.details.length > 0) {
+          message += `\n\n❌ Errors (${errors.count}):\n`;
+          errors.details.forEach(e => {
+            message += `• Row ${e.row} (${e.studentId}): ${e.errors.join(', ')}\n`;
+          });
+          if (errors.hasMore) {
+            message += `... and ${errors.count - errors.details.length} more errors\n`;
+          }
+        }
+
+        // Choose appropriate toast type
+        if (summary.errorCount > 0 || summary.warningCount > 0) {
+          toast.warn(message, { autoClose: 12000 });
+        } else {
+          toast.success(message, { autoClose: 8000 });
+        }
+
+        // Refresh data if any records were processed
         if (summary.insertedCount > 0 || summary.updatedCount > 0) {
           await refreshData();
         }
+        
+        // Log detailed info to console for debugging
+        console.log('Import Results:', {
+          summary,
+          updated,
+          errors: errors?.details,
+          warnings: warnings?.details
+        });
+        
       } else {
         toast.error(response.data.message || 'Import failed');
       }
     } catch (err) {
-      toast.error('Import error: ' + (err.response?.data?.message || err.message));
+      const errorData = err.response?.data;
+      let errorMessage = 'Import error: ';
+      
+      if (errorData?.message) {
+        errorMessage += errorData.message;
+      } else {
+        errorMessage += err.message;
+      }
+
+      // Handle specific error cases
+      if (err.response?.status === 413) {
+        errorMessage = 'File quá lớn! Vui lòng chọn file nhỏ hơn 10MB.';
+      } else if (err.response?.status === 400 && errorData?.invalidRows) {
+        errorMessage += `\n\nChi tiết lỗi:`;
+        errorData.invalidRows.slice(0, 3).forEach(row => {
+          errorMessage += `\nDòng ${row.row}: ${row.errors?.join(', ') || 'Lỗi không xác định'}`;
+        });
+        
+        if (errorData.totalInvalidRows > 3) {
+          errorMessage += `\n... và ${errorData.totalInvalidRows - 3} lỗi khác`;
+        }
+      }
+
+      toast.error(errorMessage, { autoClose: 10000 });
+      
+      // Log detailed error info for debugging
+      if (errorData) {
+        console.error('Import Error Details:', errorData);
+      }
     } finally {
       setLoading(false);
       if (fileInputRef.current) {
@@ -458,9 +536,22 @@ export default function PhysicalFitness() {
               className="border rounded px-3 py-1.5 min-w-[120px]"
             >
                 {examSessions.length === 0 && <option value="">No exam session</option>}
-                {examSessions.length > 0 && examSessions.map(session => (
-                  <option key={session._id} value={session._id}>{session.examSessionAcademicYear} </option>
-                ))}
+                {examSessions.length > 0 && 
+                  [...examSessions]
+                    .sort((a, b) => {
+                      const getYear = (s) => {
+                        if (s.examSessionAcademicYear) {
+                          const y = parseInt(String(s.examSessionAcademicYear).split('-')[0]);
+                          return isNaN(y) ? 0 : y;
+                        }
+                        return s.createdAt ? new Date(s.createdAt).getFullYear() : 0;
+                      };
+                      return getYear(b) - getYear(a); // Descending order (newest first)
+                    })
+                    .map(session => (
+                      <option key={session._id} value={session._id}>{session.examSessionAcademicYear}</option>
+                    ))
+                }
             </select>
           </div>
           <div className="flex items-center gap-2">

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   Alert,
   Image,
   Animated,
+  RefreshControl,
 } from 'react-native';
 import { assets } from '../../assets/images/assets.js';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -72,6 +73,7 @@ const StudentHealthDashboard: React.FC = () => {
     overall: 0
   });
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   // Animation refs
   const spinValue = useRef(new Animated.Value(0)).current;
@@ -114,124 +116,135 @@ const StudentHealthDashboard: React.FC = () => {
     }
   }, [loading]);
 
-  useEffect(() => {
-    let isMounted = true; 
-    
-    const fetchAll = async () => {
+  const fetchAll = useCallback(async (isRefresh = false) => {
+    try {
+      const user = await getInfoUser();
+      
+      if (!user?.userData) {
+        throw new Error('User data not found');
+      }
+      
+      setStudentData(user.userData);
+      
+      if (!user.userData.studentId) {
+        throw new Error('Student ID not found');
+      }
+
       try {
-        const user = await getInfoUser();
-        if (!isMounted) return;
+        const physical = await getPhysicalData(user.userData.studentId);
         
-        if (!user?.userData) {
-          throw new Error('User data not found');
-        }
-        
-        setStudentData(user.userData);
-        
-        if (!user.userData.studentId) {
-          throw new Error('Student ID not found');
-        }
-  
-        try {
-          const physical = await getPhysicalData(user.userData.studentId);
-          if (!isMounted) return;
-          
-          
-          let latestPhysical = null;
-          if (physical?.success && physical?.data) {
-            if (Array.isArray(physical.data) && physical.data.length > 0) {
-              // get the latest record with all information
-              const validRecords = physical.data.filter((record: any) => 
-                record && 
-                record.height && 
-                record.weight && 
-                record.bmi
-              );
-              if (validRecords.length > 0) {
-                latestPhysical = validRecords[validRecords.length - 1];
-              }
+        let latestPhysical = null;
+        if (physical?.success && physical?.data) {
+          if (Array.isArray(physical.data) && physical.data.length > 0) {
+            // get the latest record with all information
+            const validRecords = physical.data.filter((record: any) => 
+              record && 
+              record.height && 
+              record.weight && 
+              record.bmi
+            );
+            if (validRecords.length > 0) {
+              latestPhysical = validRecords[validRecords.length - 1];
             }
           }
-          
-          setHealthMetrics(latestPhysical);
-         
-        } catch (physicalError) {
-          console.warn('Failed to fetch physical data:', physicalError);
-          setHealthMetrics(null);
         }
-  
-        try {
-          const abnormal = await getAbnormality(user.userData.studentId);
-          if (!isMounted) return;
-          
         
-          
-          setAbnormalityHistory(Array.isArray(abnormal?.data) ? abnormal.data : []);
-          
-          console.log('AbnormalityHistory set to:', Array.isArray(abnormal?.data) ? abnormal.data : []);
-        } catch (abnormalError) {
-          console.warn('Failed to fetch abnormal data:', abnormalError);
-          setAbnormalityHistory([]);
-        }
-  
-        try {
-          const scores = await getHealthScores(user.userData.studentId);
-          if (!isMounted) return;
-          
-          if (scores?.success && scores?.data) {
-            setHealthScores(scores.data);
-          }
-        } catch (scoresError) {
-          console.warn('Failed to fetch health scores:', scoresError);
-        }
-  
-      } catch (err) {
-        if (!isMounted) return;
-        
-        console.error('Error in fetchAll:', err);
-        Alert.alert(
-          'Error', 
-          (err as Error).message || 'Could not load data. Please try again later.',
-          [
-            { text: 'Try again', onPress: () => fetchAll() },
-            { text: 'Close', style: 'cancel' }
-          ]
-        );
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
+        setHealthMetrics(latestPhysical);
+       
+      } catch (physicalError) {
+        console.warn('Failed to fetch physical data:', physicalError);
+        setHealthMetrics(null);
       }
-    };
-  
-    fetchAll();
-    
-    return () => {
-      isMounted = false;
-    };
+
+      try {
+        const abnormal = await getAbnormality(user.userData.studentId);
+        
+        setAbnormalityHistory(Array.isArray(abnormal?.data) ? abnormal.data : []);
+        
+        console.log('AbnormalityHistory set to:', Array.isArray(abnormal?.data) ? abnormal.data : []);
+      } catch (abnormalError) {
+        console.warn('Failed to fetch abnormal data:', abnormalError);
+        setAbnormalityHistory([]);
+      }
+
+      try {
+        const scores = await getHealthScores(user.userData.studentId);
+        
+        if (scores?.success && scores?.data) {
+          setHealthScores(scores.data);
+        }
+      } catch (scoresError) {
+        console.warn('Failed to fetch health scores:', scoresError);
+      }
+
+    } catch (err) {
+      console.error('Error in fetchAll:', err);
+      Alert.alert(
+        'Error', 
+        (err as Error).message || 'Could not load data. Please try again later.',
+        [
+          { text: 'Try again', onPress: () => fetchAll() },
+          { text: 'Close', style: 'cancel' }
+        ]
+      );
+    } finally {
+      if (!isRefresh) {
+        setLoading(false);
+      }
+      setRefreshing(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchAll();
+  }, [fetchAll]);
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    fetchAll(true);
+  }, [fetchAll]);
 
   const getBMIStatus = (bmi: string) => {
     const bmiNum = parseFloat(bmi);
-    if (bmiNum < 18.5) return { status: 'Underweight', color: '#3B82F6' };
-    if (bmiNum < 25) return { status: 'Normal', color: '#10B981' };
-    if (bmiNum < 30) return { status: 'Overweight', color: '#F59E0B' };
-    return { status: 'Obese', color: '#EF4444' };
+  
+    if (isNaN(bmiNum)) {
+      return { status: 'Invalid BMI', color: '#808080' }; 
+    }
+  
+    if (bmiNum < 18.5) {
+      return { status: 'Underweight', color: '#3B82F6' }; 
+    } else if (18.5 <= bmiNum && bmiNum < 23) { 
+      return { status: 'Normal', color: '#10B981' }; 
+    } else if (23 <= bmiNum && bmiNum < 25) { 
+      return { status: 'Overweight (Pre-obese)', color: '#F59E0B' }; 
+    } else if (25 <= bmiNum && bmiNum < 30) { 
+      return { status: 'Obese Class I', color: '#EF4444' }; 
+    } else { 
+      return { status: 'Obese Class II', color: '#CC0000' }; 
+    }
   };
+  const getHealthScoreStatus = (score: number) => {
+    if (score >= 90) return 'High';
+    if (75 <= score && score < 90) return 'Medium';
+    if (60 <= score && score < 75) return 'Low';
+    return 'Low';
+  };  
 
   const getHealthScoreColor = (score: number): string => {
-    if (score >= 90) return '#10B981'; // Green
-    if (score >= 75) return '#3B82F6'; // Blue
-    if (score >= 60) return '#F59E0B'; // Yellow/Orange
-    return '#EF4444'; // Red
+
+    if (score >= 90 && score <= 100) return '#10B981'; 
+    if (75 <= score && score < 90) return '#3B82F6'; 
+    if (60 <= score && score < 75) return '#F59E0B'; 
+    if (score < 60) return '#EF4444'; 
+    return '#EF4444'; 
   };
 
   const getSeverityColor = (severity: string) => {
     switch(severity) {
-      case 'High': return { bg: '#FEE2E2', text: '#991B1B' }; // Red
-      case 'Medium': return { bg: '#FEF3C7', text: '#92400E' }; // Orange
-      case 'Low': return { bg: '#D1FAE5', text: '#065F46' }; // Green
-      default: return { bg: '#F3F4F6', text: '#374151' }; // Grey
+      case 'High': return { bg: '#FEE2E2', text: '#991B1B' }; 
+      case 'Medium': return { bg: '#FEF3C7', text: '#92400E' }; 
+      case 'Low': return { bg: '#D1FAE5', text: '#065F46' }; 
+      default: return { bg: '#F3F4F6', text: '#374151' }; 
     }
   };
 
@@ -371,7 +384,18 @@ const StudentHealthDashboard: React.FC = () => {
             </View>
           </View>
 
-          <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+          <ScrollView 
+            style={styles.scrollView} 
+            showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl 
+                refreshing={refreshing} 
+                onRefresh={onRefresh}
+                colors={['#60A5FA']}
+                tintColor="#60A5FA"
+              />
+            }
+          >
             {/* Welcome Card for New Student */}
             <View style={styles.welcomeCard}>
               <LinearGradient
@@ -545,7 +569,18 @@ const StudentHealthDashboard: React.FC = () => {
           </View>
         </View>
 
-        <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+        <ScrollView 
+          style={styles.scrollView} 
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl 
+              refreshing={refreshing} 
+              onRefresh={onRefresh}
+              colors={['#60A5FA']}
+              tintColor="#60A5FA"
+            />
+          }
+        >
           {/* Student Profile Card */}
           <View style={styles.profileCard}>
             <View style={styles.profileHeader}>
@@ -641,8 +676,8 @@ const StudentHealthDashboard: React.FC = () => {
               'heart-outline', 
               'Heart Rate',
               `${healthMetrics?.heartRate} bpm`,
-              'Normal',
-              '#EF4444'
+              getHealthScoreStatus(healthMetrics?.heartRate || 0),
+              getHealthScoreColor(healthMetrics?.heartRate || 0)
             )}
           </View>
 

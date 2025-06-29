@@ -45,13 +45,21 @@ interface RootState {
 const { width: screenWidth } = Dimensions.get("window");
 
 const Chatbot: React.FC = () => {
-  
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
   const [inputHeight, setInputHeight] = useState<number>(50);
+  const [isInitialLoad, setIsInitialLoad] = useState<boolean>(true);
+  const [previousMessageCount, setPreviousMessageCount] = useState<number>(0);
   const flatListRef = useRef<FlatList<Message>>(null);
   const user = useSelector((state: RootState) => state.auth.user);
+
+  // Scroll to bottom function
+  const scrollToBottom = (animated: boolean = true) => {
+    if (flatListRef.current) {
+      flatListRef.current.scrollToEnd({ animated });
+    }
+  };
 
   const sendMessage = async (): Promise<void> => {
     if (!input.trim()) return;
@@ -81,13 +89,7 @@ const Chatbot: React.FC = () => {
       const updatedMessages = [...messages, userMessage, botMessage];
       setMessages(updatedMessages);
 
-      
-      if (user?.studentId) {
-        console.log("User object:", user); 
-        if (!user.studentName) {
-          console.error("studentName is missing in user object");
-          return;
-        }
+      if (user?.studentId && user?.studentName) {
         try {
           await saveChatHistory({
             studentId: user.studentId,
@@ -96,7 +98,6 @@ const Chatbot: React.FC = () => {
           });
         } catch (error) {
           console.error("Error saving chat history:", error);
-          
         }
       }
     } catch (err) {
@@ -158,11 +159,9 @@ const Chatbot: React.FC = () => {
         timestamp: new Date(),
       };
 
-      
       const updatedMessages = [...messages, userMessage, botMessage];
       setMessages(updatedMessages);
 
-      
       if (user?.studentId && user?.studentName) {
         try {
           await saveChatHistory({
@@ -190,65 +189,75 @@ const Chatbot: React.FC = () => {
     }
   };
 
+  // Only auto-scroll for new messages, not when loading history
   useEffect(() => {
-    const timer = setTimeout(() => {
-      flatListRef.current?.scrollToEnd({ animated: true });
-    }, 100);
-    return () => clearTimeout(timer);
-  }, [messages]);
+    if (!isInitialLoad && messages.length > previousMessageCount) {
+      // Only scroll when there are genuinely new messages
+      setTimeout(() => scrollToBottom(true), 100);
+    }
+    setPreviousMessageCount(messages.length);
+  }, [messages.length, isInitialLoad, previousMessageCount]);
 
- useEffect(() => {
-  const loadChatHistory = async () => {
-    if (user?.studentId) {
-      try {
-        const response = await getChatHistory(user.studentId);
-        if (response && Array.isArray(response.messages) && response.messages.length > 0) {
-          const messagesWithId = response.messages.map((msg: { sender: string; content: string; timestamp: Date; id?: string }) => ({
-            ...msg,
-            id: msg.id || `${Date.now()}-${msg.sender}-${Math.random().toString(36).substring(2, 9)}`
-          }));
-          setMessages(messagesWithId);
-          return;
-        }
-        
-        const welcomeMessage: Message = {
-          id: `welcome-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-          sender: "bot",
-          content: "Xin chào! Tôi là trợ lý sức khỏe AI của bạn. Tôi có thể giúp gì cho bạn hôm nay? 🏥✨",
-          timestamp: new Date(),
-        };
-        setMessages([welcomeMessage]);
-      } catch (error: unknown) {
-        
-        if (
-          error && 
-          typeof error === 'object' && 
-          'response' in error && 
-          error.response && 
-          typeof error.response === 'object' && 
-          ('status' in error.response || 'data' in error.response)
-        ) {
-          const response = error.response as { status?: number; data?: { message?: string } };
-          if (
-            response.status === 404 ||
-            response.data?.message === "No chat history found"
-          ) {
-            const welcomeMessage: Message = {
-              id: `welcome-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-              sender: "bot",
-              content: "Xin chào! Tôi là trợ lý sức khỏe AI của bạn. Tôi có thể giúp gì cho bạn hôm nay? 🏥✨",
-              timestamp: new Date(),
-            };
-            setMessages([welcomeMessage]);
+  // Load chat history on component mount
+  useEffect(() => {
+    const loadChatHistory = async () => {
+      if (user?.studentId) {
+        try {
+          const response = await getChatHistory(user.studentId);
+          if (response && Array.isArray(response.messages) && response.messages.length > 0) {
+            const messagesWithId = response.messages.map((msg: { sender: string; content: string; timestamp: Date; id?: string }) => ({
+              ...msg,
+              id: msg.id || `${Date.now()}-${msg.sender}-${Math.random().toString(36).substring(2, 9)}`
+            }));
+            setMessages(messagesWithId);
+            setPreviousMessageCount(messagesWithId.length);
+            setIsInitialLoad(false);
+            // Don't auto-scroll when loading history - preserve scroll position
             return;
           }
+          
+          const welcomeMessage: Message = {
+            id: `welcome-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+            sender: "bot",
+            content: "Xin chào! Tôi là trợ lý sức khỏe AI của bạn. Tôi có thể giúp gì cho bạn hôm nay? 🏥✨",
+            timestamp: new Date(),
+          };
+          setMessages([welcomeMessage]);
+          setPreviousMessageCount(1);
+          setIsInitialLoad(false);
+        } catch (error: unknown) {
+          if (
+            error && 
+            typeof error === 'object' && 
+            'response' in error && 
+            error.response && 
+            typeof error.response === 'object' && 
+            ('status' in error.response || 'data' in error.response)
+          ) {
+            const response = error.response as { status?: number; data?: { message?: string } };
+            if (
+              response.status === 404 ||
+              response.data?.message === "No chat history found"
+            ) {
+              const welcomeMessage: Message = {
+                id: `welcome-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+                sender: "bot",
+                content: "Xin chào! Tôi là trợ lý sức khỏe AI của bạn. Tôi có thể giúp gì cho bạn hôm nay? 🏥✨",
+                timestamp: new Date(),
+              };
+              setMessages([welcomeMessage]);
+              setPreviousMessageCount(1);
+              setIsInitialLoad(false);
+              return;
+            }
+          }
+          console.error("Error loading chat history:", error);
+          setIsInitialLoad(false);
         }
-        console.error("Error loading chat history:", error);
       }
-    }
-  };
-  loadChatHistory();
-}, [user?.studentId]);
+    };
+    loadChatHistory();
+  }, [user?.studentId]);
 
   const formatTime = (date: Date): string => {
     return date.toLocaleTimeString("vi-VN", {
@@ -270,52 +279,52 @@ const Chatbot: React.FC = () => {
 
   const renderItem = ({ item }: { item: Message }) => (
     <View style={styles.messageWrapper}>
-        <View
-          style={[
-            styles.messageContainer,
-            item.sender === "user" ? styles.userMsg : styles.botMsg,
-          ]}
-        >
-          {item.sender === "bot" && (
-            <View style={styles.botAvatar}>
-              <Text style={styles.botAvatarText}>🤖</Text>
-            </View>
+      <View
+        style={[
+          styles.messageContainer,
+          item.sender === "user" ? styles.userMsg : styles.botMsg,
+        ]}
+      >
+        {item.sender === "bot" && (
+          <View style={styles.botAvatar}>
+            <Text style={styles.botAvatarText}>🤖</Text>
+          </View>
+        )}
+        
+        <View style={styles.messageContent}>
+          {item.sender === "bot" ? (
+            <Markdown 
+              style={{
+                body: { 
+                  color: "#2d3748", 
+                  fontSize: 15,
+                  lineHeight: 22,
+                  fontWeight: "400"
+                },
+                strong: { color: "#1a202c", fontWeight: "600" },
+                em: { fontStyle: "italic", color: "#4a5568" }
+              }}
+            >
+              {item.content}
+            </Markdown>
+          ) : (
+            <Text style={[styles.messageText, styles.userText]}>
+              {item.content} 
+            </Text>
           )}
           
-          <View style={styles.messageContent}>
-            {item.sender === "bot" ? (
-              <Markdown 
-                style={{
-                  body: { 
-                    color: "#2d3748", 
-                    fontSize: 15,
-                    lineHeight: 22,
-                    fontWeight: "400"
-                  },
-                  strong: { color: "#1a202c", fontWeight: "600" },
-                  em: { fontStyle: "italic", color: "#4a5568" }
-                }}
-              >
-                {item.content}
-              </Markdown>
-            ) : (
-              <Text style={[styles.messageText, styles.userText]}>
-                {item.content} 
-              </Text>
-            )}
-            
-            <Text
-              style={[
-                styles.timestamp,
-                item.sender === "user" ? styles.userTimestamp : styles.botTimestamp,
-              ]}
-            >
-              {formatTime(item.timestamp)}
-            </Text>
-          </View>
+          <Text
+            style={[
+              styles.timestamp,
+              item.sender === "user" ? styles.userTimestamp : styles.botTimestamp,
+            ]}
+          >
+            {formatTime(item.timestamp)}
+          </Text>
         </View>
       </View>
-    );
+    </View>
+  );
 
   const renderTypingIndicator = () => (
     <View style={[styles.messageWrapper, { opacity: 0.8 }]}>
@@ -343,7 +352,6 @@ const Chatbot: React.FC = () => {
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
       >
-        
         <View style={styles.header}>
           <View style={styles.headerGradient}>
             <View style={styles.headerContent}>
@@ -353,7 +361,6 @@ const Chatbot: React.FC = () => {
                 </View>
                 <View>
                   <Text style={styles.headerTitle}>Health AI Assistant</Text>
-
                 </View>
               </View>
               
@@ -377,6 +384,10 @@ const Chatbot: React.FC = () => {
           ListFooterComponent={loading ? renderTypingIndicator : null}
           style={styles.messagesContainer}
           extraData={messages}
+          maintainVisibleContentPosition={{
+            minIndexForVisible: 0,
+            autoscrollToTopThreshold: 10,
+          }}
         />
 
         <View style={styles.inputContainer}>
@@ -425,9 +436,6 @@ const Chatbot: React.FC = () => {
                 )}
               </TouchableOpacity>
             </View>
-            
-                
-            
           </View>
         </View>
       </KeyboardAvoidingView>
@@ -485,11 +493,6 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: "#ffffff",
     marginBottom: 2,
-  },
-  headerSubtitle: {
-    fontSize: 13,
-    color: "rgba(255, 255, 255, 0.8)",
-    fontWeight: "400",
   },
   statusContainer: {
     alignItems: "flex-end",
@@ -683,12 +686,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
   },
-  characterCounter: {
-    fontSize: 11,
-    color: "#9ca3af",
-    marginTop: 8,
-    marginRight: 12,
-  },
 });
 
-export default Chatbot;
+export default Chatbot; 

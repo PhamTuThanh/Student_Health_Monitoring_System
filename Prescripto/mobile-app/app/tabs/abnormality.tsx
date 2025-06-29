@@ -61,9 +61,7 @@ const Abnormality = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedItem, setSelectedItem] = useState<AbnormalityItem | null>(null);
-  const [selectedPrescription, setSelectedPrescription] = useState<PrescriptionItem | null>(null);
   const [studentId, setStudentId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'abnormality' | 'prescription'>('abnormality');
   
   const userInfo = useSelector((state: any) => state.auth.userInfo);
 
@@ -84,6 +82,7 @@ const Abnormality = () => {
 
     fetchUserInfo();
   }, []);
+
   const fetchAbnormalities = async () => {
     if (!studentId) {
       Alert.alert('Error', 'Cannot find student info');
@@ -104,7 +103,6 @@ const Abnormality = () => {
       console.log('Prescription API response:', prescriptionResponse);
       
       if (abnormalityResponse && abnormalityResponse.success && abnormalityResponse.data) {
-        // Nếu data là object đơn lẻ, wrap vào array
         const isArray = Array.isArray(abnormalityResponse.data);
         console.log('Raw abnormality data:', abnormalityResponse.data);
         console.log('Is abnormality data array?', isArray);
@@ -128,7 +126,6 @@ const Abnormality = () => {
       }
 
       if (prescriptionResponse && prescriptionResponse.success && prescriptionResponse.data) {
-        // Nếu data là object đơn lẻ, wrap vào array
         const isArray = Array.isArray(prescriptionResponse.data);
         console.log('Raw prescription data:', prescriptionResponse.data);
         console.log('Is prescription data array?', isArray);
@@ -161,36 +158,9 @@ const Abnormality = () => {
     }
   }, [studentId]);
 
-
   const onRefresh = () => {
     setRefreshing(true);
     fetchAbnormalities();
-  };
-
-  const getSeverityColor = (severity: string) => {
-    switch (severity?.toLowerCase()) {
-      case 'high':
-        return '#ef4444';
-      case 'medium':
-        return '#f59e0b';
-      case 'low':
-        return '#06b6d4';
-      default:
-        return '#6b7280';
-    }
-  };
-
-  const getSeverityText = (severity: string) => {
-    switch (severity?.toLowerCase()) {
-      case 'high':
-        return 'High';
-      case 'medium':
-        return 'Medium';
-      case 'low':
-        return 'Low';
-      default:
-        return 'Unknown';
-    }
   };
 
   const formatDate = (dateString: string) => {
@@ -204,253 +174,219 @@ const Abnormality = () => {
     });
   };
 
-  const renderAbnormalityItem = (item: AbnormalityItem) => (
-    <TouchableOpacity
-      key={item._id}
-      style={styles.abnormalityCard}
-      onPress={() => setSelectedItem(selectedItem?._id === item._id ? null : item)}
-      activeOpacity={0.7}
-    >
-      <View style={styles.cardHeader}>
-        <View style={styles.headerLeft}>
-          <View style={[styles.severityDot, { backgroundColor: '#ef4444' }]} />
-          <Text style={styles.abnormalityType}>
-            Abnormality Report
-          </Text>
-        </View>
-        <View style={styles.headerRight}>
-          <Ionicons
-            name={selectedItem?._id === item._id ? "chevron-up" : "chevron-down"}
-            size={20}
-            color="#6b7280"
-          />
-        </View>
-      </View>
-
-      <Text style={styles.dateText}>{formatDate(item.date)}</Text>
-      
-      <View style={styles.studentInfo}>
-        <Text style={styles.studentText}>Student: {item.studentName}</Text>
-        <Text style={styles.doctorText}>Doctor: {item.doctorName}</Text>
-      </View>
-
-      {selectedItem?._id === item._id && (
-        <View style={styles.expandedContent}>
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Symptoms:</Text>
-            {item.symptoms.map((symptom, index) => (
-              <Text key={index} style={styles.symptomItem}>• {symptom}</Text>
-            ))}
-          </View>
-          
-          {item.temporaryTreatment && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Temporary Treatment:</Text>
-              <Text style={styles.sectionContent}>{item.temporaryTreatment}</Text>
-            </View>
-          )}
-        </View>
-      )}
-    </TouchableOpacity>
-  );
+  // Tìm prescription liên quan đến abnormality
+  const findRelatedPrescription = (abnormalityId: string) => {
+    return prescriptions.find(prescription => prescription.abnormalityId === abnormalityId);
+  };
 
   const renderMedicine = (medicine: Medicine, index: number) => (
-    <View key={index} style={styles.medicineItem}>
+    <View key={index} style={styles.medicineCard}>
       <View style={styles.medicineHeader}>
-        <Text style={styles.medicineName}>
-          {medicine.drugId?.drugName || 'Unknown Medicine'}
-        </Text>
-        <Text style={styles.medicineCode}>
-          ({medicine.drugId?.drugCode || 'N/A'})
-        </Text>
+        <View style={styles.pillIcon}>
+          <Ionicons name="medical" size={16} color="#3B82F6" />
+        </View>
+        <View style={styles.medicineInfo}>
+          <Text style={styles.medicineName}>
+            {medicine.drugId?.drugName || 'Unknown Medicine'}
+          </Text>
+          <Text style={styles.medicineCode}>
+            {medicine.drugId?.drugCode || 'N/A'}
+          </Text>
+        </View>
       </View>
       
       <View style={styles.medicineDetails}>
-        <View style={styles.medicineDetailRow}>
-          <Text style={styles.detailLabel}>Dosage:</Text>
-          <Text style={styles.detailValue}>{medicine.dosage}</Text>
+        <View style={styles.medicineRow}>
+          <Text style={styles.medicineLabel}>Dosage:</Text>
+          <Text style={styles.medicineValue}>{medicine.dosage}</Text>
         </View>
-        <View style={styles.medicineDetailRow}>
-          <Text style={styles.detailLabel}>Frequency:</Text>
-          <Text style={styles.detailValue}>{medicine.frequency}</Text>
+        <View style={styles.medicineRow}>
+          <Text style={styles.medicineLabel}>Frequency:</Text>
+          <Text style={styles.medicineValue}>{medicine.frequency}</Text>
         </View>
-        <View style={styles.medicineDetailRow}>
-          <Text style={styles.detailLabel}>Duration:</Text>
-          <Text style={styles.detailValue}>{medicine.duration}</Text>
+        <View style={styles.medicineRow}>
+          <Text style={styles.medicineLabel}>Duration:</Text>
+          <Text style={styles.medicineValue}>{medicine.duration}</Text>
         </View>
-        <View style={styles.medicineDetailRow}>
-          <Text style={styles.detailLabel}>Quantity:</Text>
-          <Text style={styles.detailValue}>
+        <View style={styles.medicineRow}>
+          <Text style={styles.medicineLabel}>Quantity:</Text>
+          <Text style={styles.medicineValue}>
             {medicine.quantity} {medicine.drugId?.drugUnit || 'units'}
           </Text>
         </View>
-        {medicine.notes && (
-          <View style={styles.medicineDetailRow}>
-            <Text style={styles.detailLabel}>Notes:</Text>
-            <Text style={styles.detailValue}>{medicine.notes}</Text>
-          </View>
-        )}
       </View>
+      
+      {medicine.notes && (
+        <View style={styles.medicineNotes}>
+          <Text style={styles.notesText}>{medicine.notes}</Text>
+        </View>
+      )}
     </View>
   );
 
-  const renderPrescriptionItem = (item: PrescriptionItem) => (
-    <TouchableOpacity
-      key={item._id}
-      style={styles.prescriptionCard}
-      onPress={() => setSelectedPrescription(selectedPrescription?._id === item._id ? null : item)}
-      activeOpacity={0.7}
-    >
-      <View style={styles.cardHeader}>
-        <View style={styles.headerLeft}>
-          <View style={styles.prescriptionIcon}>
-            <Ionicons name="medical" size={20} color="#3b82f6" />
-          </View>
-          <View style={styles.headerInfo}>
-            <Text style={styles.prescriptionTitle}>Medical Prescription</Text>
-            <Text style={styles.doctorName}>Dr. {item.doctorName}</Text>
-          </View>
+  const renderPrescriptionSection = (prescription: PrescriptionItem) => (
+    <View style={styles.prescriptionSection}>
+      <View style={styles.prescriptionHeader}>
+        <View style={styles.rxBadge}>
+          <Text style={styles.rxText}>Rx</Text>
         </View>
-        <View style={styles.headerRight}>
-          <Ionicons
-            name={selectedPrescription?._id === item._id ? "chevron-up" : "chevron-down"}
-            size={20}
-            color="#6b7280"
-          />
+        <View style={styles.prescriptionInfo}>
+          <Text style={styles.prescriptionTitle}>Prescription</Text>
+          <Text style={styles.prescriptionDate}>
+            {formatDate(prescription.prescriptionDate)}
+          </Text>
         </View>
       </View>
 
-      <Text style={styles.dateText}>{formatDate(item.prescriptionDate)}</Text>
-      
       <View style={styles.diagnosisContainer}>
-        <Text style={styles.diagnosisLabel}>Diagnosis:</Text>
-        <Text style={styles.diagnosisText}>{item.diagnosis}</Text>
+        <Text style={styles.sectionLabel}>Diagnosis</Text>
+        <View style={styles.diagnosisBox}>
+          <Text style={styles.diagnosisText}>{prescription.diagnosis}</Text>
+        </View>
       </View>
 
-      {selectedPrescription?._id === item._id && (
-        <View style={styles.expandedContent}>
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Medicines ({item.medicines.length}):</Text>
-            {item.medicines.map((medicine, index) => renderMedicine(medicine, index))}
+      <View style={styles.medicinesContainer}>
+        <Text style={styles.sectionLabel}>
+          Medications ({prescription.medicines.length})
+        </Text>
+        {prescription.medicines.map((medicine, index) => renderMedicine(medicine, index))}
+      </View>
+
+      {prescription.notes && (
+        <View style={styles.doctorNotesContainer}>
+          <Text style={styles.sectionLabel}>Doctor's Notes</Text>
+          <View style={styles.notesBox}>
+            <Text style={styles.doctorNotesText}>{prescription.notes}</Text>
           </View>
-          
-          {item.notes && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Additional Notes:</Text>
-              <Text style={styles.sectionContent}>{item.notes}</Text>
-            </View>
-          )}
         </View>
       )}
-    </TouchableOpacity>
+    </View>
   );
+
+  const renderAbnormalityItem = (item: AbnormalityItem) => {
+    const relatedPrescription = findRelatedPrescription(item._id);
+    
+    return (
+      <View key={item._id} style={styles.modernCard}>
+        <TouchableOpacity
+          onPress={() => setSelectedItem(selectedItem?._id === item._id ? null : item)}
+          activeOpacity={0.7}
+        >
+          <View style={styles.cardContent}>
+            <View style={styles.cardTop}>
+              <View style={styles.statusBadge}>
+                <View style={styles.alertDot} />
+                <Text style={styles.badgeText}>Health Alert</Text>
+              </View>
+              <Text style={styles.cardDate}>{formatDate(item.date)}</Text>
+            </View>
+            
+            <View style={styles.cardBody}>
+              <View style={styles.patientInfo}>
+                <View style={styles.avatarContainer}>
+                  <Ionicons name="person" size={24} color="#fff" />
+                </View>
+                <View style={styles.patientDetails}>
+                  <Text style={styles.patientName}>{item.studentName}</Text>
+                  <Text style={styles.doctorInfo}>Dr. {item.doctorName}</Text>
+                </View>
+              </View>
+              
+              <View style={styles.cardActions}>
+                {relatedPrescription && (
+                  <View style={styles.prescriptionIndicator}>
+                    <Ionicons name="medical" size={16} color="#3B82F6" />
+                  </View>
+                )}
+                <TouchableOpacity style={styles.expandButton}>
+                  <Ionicons
+                    name={selectedItem?._id === item._id ? "chevron-up" : "chevron-down"}
+                    size={20}
+                    color="#6B7280"
+                  />
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </TouchableOpacity>
+
+        {selectedItem?._id === item._id && (
+          <View style={styles.expandedSection}>
+            <View style={styles.symptomsSection}>
+              <Text style={styles.sectionLabel}>Symptoms Reported</Text>
+              <View style={styles.symptomsList}>
+                {item.symptoms.map((symptom, index) => (
+                  <View key={index} style={styles.symptomChip}>
+                    <Text style={styles.symptomText}>{symptom}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+            
+            {item.temporaryTreatment && (
+              <View style={styles.treatmentSection}>
+                <Text style={styles.sectionLabel}>Immediate Care</Text>
+                <View style={styles.treatmentBox}>
+                  <Text style={styles.treatmentText}>{item.temporaryTreatment}</Text>
+                </View>
+              </View>
+            )}
+
+            {relatedPrescription && renderPrescriptionSection(relatedPrescription)}
+          </View>
+        )}
+      </View>
+    );
+  };
 
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#3b82f6" />
-        <Text style={styles.loadingText}>Loading data...</Text>
+        <View style={styles.loadingCard}>
+          <ActivityIndicator size="large" color="#3B82F6" />
+          <Text style={styles.loadingText}>Loading health records...</Text>
+        </View>
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+      {/* Modern Header */}
+      <View style={styles.modernHeader}>
+        <View style={styles.headerContent}>
+          <Text style={styles.headerTitle}>Health Records</Text>
+          <Text style={styles.headerSubtitle}>
+            {abnormalities.length} health alert{abnormalities.length !== 1 ? 's' : ''}
+          </Text>
+        </View>
         <View style={styles.headerIcon}>
-          <Ionicons name="medical" size={24} color="#ef4444" />
-        </View>
-        <View style={styles.headerText}>
-          <Text style={styles.title}>Health Records</Text>
-          <Text style={styles.subtitle}>
-            Medical abnormalities and prescriptions
-          </Text>
+          <Ionicons name="fitness" size={28} color="#EF4444" />
         </View>
       </View>
 
-      {/* Tab Switcher */}
-      <View style={styles.tabContainer}>
-        <TouchableOpacity
-          style={[styles.tabButton, activeTab === 'abnormality' && styles.activeTab]}
-          onPress={() => setActiveTab('abnormality')}
-        >
-          <Ionicons 
-            name="warning" 
-            size={20} 
-            color={activeTab === 'abnormality' ? '#ef4444' : '#6b7280'} 
-          />
-          <Text style={[
-            styles.tabText, 
-            activeTab === 'abnormality' && styles.activeTabText
-          ]}>
-            Abnormalities ({abnormalities.length})
-          </Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity
-          style={[styles.tabButton, activeTab === 'prescription' && styles.activeTab]}
-          onPress={() => setActiveTab('prescription')}
-        >
-          <Ionicons 
-            name="medical" 
-            size={20} 
-            color={activeTab === 'prescription' ? '#3b82f6' : '#6b7280'} 
-          />
-          <Text style={[
-            styles.tabText, 
-            activeTab === 'prescription' && styles.activeTabText
-          ]}>
-            Prescriptions ({prescriptions.length})
-          </Text>
-        </TouchableOpacity>
-      </View>
-
+      {/* Content */}
       <ScrollView
         style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
         showsVerticalScrollIndicator={false}
       >
-        {(() => {
-          console.log('Current render state:', {
-            activeTab,
-            abnormalitiesLength: abnormalities.length,
-            prescriptionsLength: prescriptions.length,
-            abnormalities: abnormalities,
-            prescriptions: prescriptions
-          });
-          
-          return activeTab === 'abnormality' ? (
-            abnormalities.length > 0 ? (
-              <View style={styles.contentContainer}>
-                {abnormalities.map(renderAbnormalityItem)}
-              </View>
-            ) : (
-              <View style={styles.emptyContainer}>
-                <Ionicons name="checkmark-circle" size={64} color="#10b981" />
-                <Text style={styles.emptyTitle}>Great!</Text>
-                <Text style={styles.emptyText}>
-                  Currently no abnormalities detected
-                </Text>
-              </View>
-            )
-          ) : (
-            prescriptions.length > 0 ? (
-              <View style={styles.contentContainer}>
-                {prescriptions.map(renderPrescriptionItem)}
-              </View>
-            ) : (
-              <View style={styles.emptyContainer}>
-                <Ionicons name="medical-outline" size={64} color="#9ca3af" />
-                <Text style={styles.emptyTitle}>No Prescriptions</Text>
-                <Text style={styles.emptyText}>
-                  You don't have any prescriptions yet
-                </Text>
-              </View>
-            )
-          );
-        })()}
+        {abnormalities.length > 0 ? (
+          abnormalities.map(renderAbnormalityItem)
+        ) : (
+          <View style={styles.emptyState}>
+            <View style={styles.emptyIcon}>
+              <Ionicons name="shield-checkmark" size={48} color="#10B981" />
+            </View>
+            <Text style={styles.emptyTitle}>All Clear!</Text>
+            <Text style={styles.emptyMessage}>
+              No health alerts at this time. Keep up the good work!
+            </Text>
+          </View>
+        )}
       </ScrollView>
     </View>
   );
@@ -458,303 +394,372 @@ const Abnormality = () => {
 
 const styles = StyleSheet.create({
   container: {
-    marginTop: 20,
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#F8FAFC',
   },
-  header: {
+  modernHeader: {
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 20,
+    paddingTop: 60,
+    paddingBottom: 20,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#ffffff',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    justifyContent: 'space-between',
     borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 3,
+    borderBottomColor: '#E5E7EB',
   },
-  headerIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#fef2f2',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  headerText: {
-    paddingTop: 20,
+  headerContent: {
     flex: 1,
   },
-  title: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#1f2937',
+  headerTitle: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#111827',
     marginBottom: 4,
   },
-  subtitle: {
-    fontSize: 14,
-    color: '#6b7280',
+  headerSubtitle: {
+    fontSize: 16,
+    color: '#6B7280',
+  },
+  headerIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#FEF2F2',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   scrollView: {
     flex: 1,
   },
-  contentContainer: {
+  scrollContent: {
     padding: 16,
+    gap: 16,
   },
-  abnormalityCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
+  modernCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 4,
+    overflow: 'hidden',
   },
-  cardHeader: {
+  cardContent: {
+    padding: 20,
+  },
+  cardTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 16,
   },
-  headerLeft: {
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEF2F2',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    gap: 6,
+  },
+  alertDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#EF4444',
+  },
+  badgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#DC2626',
+  },
+  cardDate: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    fontWeight: '500',
+  },
+  cardBody: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  patientInfo: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
+    gap: 12,
   },
-  headerRight: {
-    flexDirection: 'row',
+  avatarContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#3B82F6',
+    justifyContent: 'center',
     alignItems: 'center',
   },
-  severityDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    marginRight: 12,
+  patientDetails: {
+    flex: 1,
   },
-  abnormalityType: {
+  patientName: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#111827',
+    marginBottom: 2,
+  },
+  doctorInfo: {
+    fontSize: 14,
+    color: '#6B7280',
+  },
+  cardActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  prescriptionIndicator: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#EFF6FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  expandButton: {
+    padding: 8,
+  },
+  expandedSection: {
+    backgroundColor: '#F9FAFB',
+    padding: 20,
+    gap: 20,
+  },
+  symptomsSection: {
+    gap: 12,
+  },
+  sectionLabel: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1f2937',
-    flex: 1,
+    color: '#374151',
   },
-  severityText: {
+  symptomsList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  symptomChip: {
+    backgroundColor: '#FEF2F2',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#FEE2E2',
+  },
+  symptomText: {
     fontSize: 14,
+    color: '#DC2626',
     fontWeight: '500',
-    marginRight: 8,
   },
-  dateText: {
-    fontSize: 12,
-    color: '#6b7280',
+  treatmentSection: {
+    gap: 12,
+  },
+  treatmentBox: {
+    backgroundColor: '#FFFFFF',
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  treatmentText: {
+    fontSize: 14,
+    color: '#374151',
+    lineHeight: 20,
+  },
+  prescriptionSection: {
+    gap: 16,
     marginTop: 4,
   },
-  studentInfo: {
-    marginTop: 8,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#f1f5f9',
-  },
-  studentText: {
-    fontSize: 13,
-    color: '#374151',
+  prescriptionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
     marginBottom: 4,
   },
-  doctorText: {
-    fontSize: 13,
+  rxBadge: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#3B82F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  rxText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  prescriptionInfo: {
+    flex: 1,
+  },
+  prescriptionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#111827',
+    marginBottom: 2,
+  },
+  prescriptionDate: {
+    fontSize: 14,
+    color: '#6B7280',
+  },
+  diagnosisContainer: {
+    gap: 8,
+  },
+  diagnosisBox: {
+    backgroundColor: '#FFFFFF',
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  diagnosisText: {
+    fontSize: 14,
     color: '#374151',
+    lineHeight: 20,
   },
-  expandedContent: {
-    marginTop: 16,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#f1f5f9',
+  medicinesContainer: {
+    gap: 12,
   },
-  section: {
+  medicineCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  medicineHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
     marginBottom: 12,
   },
-  sectionTitle: {
-    fontSize: 14,
+  pillIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#EFF6FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  medicineInfo: {
+    flex: 1,
+  },
+  medicineName: {
+    fontSize: 16,
     fontWeight: '600',
+    color: '#111827',
+    marginBottom: 2,
+  },
+  medicineCode: {
+    fontSize: 12,
+    color: '#9CA3AF',
+  },
+  medicineDetails: {
+    gap: 8,
+  },
+  medicineRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  medicineLabel: {
+    fontSize: 14,
+    color: '#6B7280',
+    fontWeight: '500',
+  },
+  medicineValue: {
+    fontSize: 14,
     color: '#374151',
-    marginBottom: 6,
+    fontWeight: '500',
   },
-  sectionContent: {
-    fontSize: 14,
-    color: '#6b7280',
-    lineHeight: 20,
+  medicineNotes: {
+    marginTop: 12,
+    padding: 12,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 8,
   },
-  symptomItem: {
+  doctorNotesContainer: {
+    gap: 8,
+  },
+  notesBox: {
+    backgroundColor: '#FFFFFF',
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  notesText: {
     fontSize: 14,
-    color: '#6b7280',
+    color: '#6B7280',
     lineHeight: 20,
-    marginBottom: 4,
+    fontStyle: 'italic',
+  },
+  doctorNotesText: {
+    fontSize: 14,
+    color: '#6B7280',
+    lineHeight: 20,
+    fontStyle: 'italic',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#F8FAFC',
+    padding: 20,
+  },
+  loadingCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 40,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 4,
   },
   loadingText: {
-    marginTop: 12,
+    marginTop: 16,
     fontSize: 16,
-    color: '#6b7280',
+    color: '#6B7280',
+    fontWeight: '500',
   },
-  emptyContainer: {
+  emptyState: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingVertical: 80,
     paddingHorizontal: 32,
-    paddingVertical: 64,
+  },
+  emptyIcon: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: '#F0FDF4',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 24,
   },
   emptyTitle: {
     fontSize: 24,
-    fontWeight: 'bold',
-    color: '#10b981',
-    marginTop: 16,
+    fontWeight: '700',
+    color: '#111827',
     marginBottom: 8,
+    textAlign: 'center',
   },
-  emptyText: {
+  emptyMessage: {
     fontSize: 16,
-    color: '#6b7280',
+    color: '#6B7280',
     textAlign: 'center',
     lineHeight: 24,
-  },
-  medicineItem: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  medicineHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  medicineName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1f2937',
-  },
-  medicineCode: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#6b7280',
-  },
-  medicineDetails: {
-    marginTop: 8,
-  },
-  medicineDetailRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  detailLabel: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#6b7280',
-  },
-  detailValue: {
-    fontSize: 14,
-    color: '#374151',
-  },
-  prescriptionCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  prescriptionIcon: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#fef2f2',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  headerInfo: {
-    flex: 1,
-  },
-  prescriptionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1f2937',
-    marginBottom: 4,
-  },
-  doctorName: {
-    fontSize: 14,
-    color: '#6b7280',
-  },
-  diagnosisContainer: {
-    marginTop: 8,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#f1f5f9',
-  },
-  diagnosisLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#374151',
-    marginBottom: 4,
-  },
-  diagnosisText: {
-    fontSize: 14,
-    color: '#6b7280',
-  },
-  tabContainer: {
-    flexDirection: 'row',
-    backgroundColor: '#ffffff',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
-  },
-  tabButton: {
-    flex: 1,
-    flexDirection: 'row',
-    padding: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: 8,
-    marginHorizontal: 4,
-  },
-  activeTab: {
-    backgroundColor: '#f0f9ff',
-    borderWidth: 1,
-    borderColor: '#3b82f6',
-  },
-  tabText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#6b7280',
-    marginLeft: 8,
-  },
-  activeTabText: {
-    color: '#3b82f6',
   },
 });
 

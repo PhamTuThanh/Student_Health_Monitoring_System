@@ -235,10 +235,10 @@ function getDanhGiaBMI(bmi) {
   if (!bmi) return "";
   const bmiValue = parseFloat(bmi);
   if (bmiValue < 18.5) return "G";
-  if (bmiValue < 22.9) return "BT";
-  if (bmiValue < 24.9) return "TC";
-  if (bmiValue < 29.9) return "BP I";
-  if (bmiValue < 30) return "BP II";
+  if (18.5 <= bmiValue && bmiValue < 22.9) return "BT";
+  if (22.9 <= bmiValue && bmiValue < 24.9) return "TC";
+  if (24.9 <= bmiValue && bmiValue < 29.9) return "BP I";
+  if (29.9 <= bmiValue && bmiValue < 30) return "BP II";
   return "BP III";
 }
 function getDanhGiaTTH(systolic, diastolic) {
@@ -293,6 +293,7 @@ const getPhysicalFitnessStatus = async (req, res) => {
     try {
         const { examSessionId,cohort } = req.query;
         const filter = {};
+        console.log(examSessionId);
         if(examSessionId){
             filter.examSessionId = examSessionId;
         }
@@ -341,6 +342,25 @@ const getPhysicalFitnessStatus = async (req, res) => {
       if (!req.file) {
         return res.status(400).json({ success: false, message: 'No file uploaded' });
       }
+
+      // Validate file extension
+      const allowedExtensions = ['.xlsx', '.xls', '.xlsm', '.xlsb', '.xltx', '.xltm'];
+      const fileExtension = req.file.originalname.toLowerCase().substring(req.file.originalname.lastIndexOf('.'));
+      if (!allowedExtensions.includes(fileExtension)) {
+        return res.status(400).json({ 
+          success: false, 
+          message: `Invalid file format. Only Excel files are allowed: ${allowedExtensions.join(', ')}` 
+        });
+      }
+
+      // Validate file size (max 10MB)
+      const maxSize = 10 * 1024 * 1024; // 10MB
+      if (req.file.size > maxSize) {
+        return res.status(400).json({ 
+          success: false, 
+          message: 'File size too large. Maximum size allowed is 10MB' 
+        });
+      }
   
       // Validate examSessionId exists
       const examSession = await examSessionModel.findById(examSessionId);
@@ -348,36 +368,210 @@ const getPhysicalFitnessStatus = async (req, res) => {
         return res.status(400).json({ success: false, message: 'Exam session not found' });
       }
   
-      const xlsx = (await import('xlsx')).default || require('xlsx');
-      const workbook = xlsx.readFile(req.file.path);
+      let xlsx, workbook, data;
+      
+      try {
+        xlsx = (await import('xlsx')).default || require('xlsx');
+        workbook = xlsx.readFile(req.file.path);
+      } catch (fileError) {
+        return res.status(400).json({ 
+          success: false, 
+          message: 'Cannot read Excel file. File may be corrupted or password protected' 
+        });
+      }
+
+      if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
+        return res.status(400).json({ 
+          success: false, 
+          message: 'Excel file contains no worksheets' 
+        });
+      }
+
       const sheetName = workbook.SheetNames[0];
       const sheet = workbook.Sheets[sheetName];
-      let data = xlsx.utils.sheet_to_json(sheet);
+      
+      try {
+        data = xlsx.utils.sheet_to_json(sheet);
+      } catch (parseError) {
+        return res.status(400).json({ 
+          success: false, 
+          message: 'Cannot parse Excel data. Please check the file format' 
+        });
+      }
   
       // Validate data structure
       if (!data || data.length === 0) {
-        return res.status(400).json({ success: false, message: 'Excel file is empty or invalid format' });
+        return res.status(400).json({ success: false, message: 'Excel file is empty or contains no valid data' });
+      }
+
+      // Check maximum rows limit
+      const maxRows = 3000;
+      if (data.length > maxRows) {
+        return res.status(400).json({ 
+          success: false, 
+          message: `Too many rows. Maximum ${maxRows} rows allowed, but file contains ${data.length} rows` 
+        });
       }
   
-      // Validate required fields
+      // Validate required fields and data format
       const requiredFields = ['studentId'];
+      const optionalNumericFields = ['height', 'weight', 'systolic', 'diastolic', 'heartRate'];
+      const optionalStringFields = ['gender', 'cohort', 'followDate'];
       const invalidRows = [];
       const validData = [];
+      const warnings = [];
   
       data.forEach((row, index) => {
-        const missingFields = requiredFields.filter(field => !row[field] && row[field] !== 0);
+        const rowNumber = index + 1;
+        const rowErrors = [];
+        const rowWarnings = [];
+        
+        // Check required fields
+        const missingFields = requiredFields.filter(field => 
+          !row[field] && row[field] !== 0 && row[field] !== '0'
+        );
+        
         if (missingFields.length > 0) {
+          rowErrors.push(`Missing required fields: ${missingFields.join(', ')}`);
+        }
+
+        // Validate studentId format
+        if (row.studentId) {
+          const studentId = String(row.studentId).trim();
+          if (studentId.length === 0) {
+            rowErrors.push('Student ID cannot be empty');
+          } else if (studentId.length > 50) {
+            rowErrors.push('Student ID is too long (max 50 characters)');
+          }
+        }
+
+        // Validate numeric fields
+        optionalNumericFields.forEach(field => {
+          if (row[field] !== undefined && row[field] !== null && row[field] !== '') {
+            const value = parseFloat(row[field]);
+            if (isNaN(value)) {
+              rowErrors.push(`${field} must be a valid number`);
+            } else if (value < 0) {
+              rowErrors.push(`${field} cannot be negative`);
+            } else {
+              // Specific validation for each field
+              switch (field) {
+                case 'height':
+                  if (value > 0 && (value < 50 || value > 250)) {
+                    rowWarnings.push(`Height ${value}cm seems unusual (expected range: 50-250cm)`);
+                  }
+                  break;
+                case 'weight':
+                  if (value > 0 && (value < 20 || value > 200)) {
+                    rowWarnings.push(`Weight ${value}kg seems unusual (expected range: 20-200kg)`);
+                  }
+                  break;
+                case 'systolic':
+                  if (value > 0 && (value < 60 || value > 250)) {
+                    rowWarnings.push(`Systolic pressure ${value} seems unusual (expected range: 60-250mmHg)`);
+                  }
+                  break;
+                case 'diastolic':
+                  if (value > 0 && (value < 40 || value > 150)) {
+                    rowWarnings.push(`Diastolic pressure ${value} seems unusual (expected range: 40-150mmHg)`);
+                  }
+                  break;
+                case 'heartRate':
+                  if (value > 0 && (value < 30 || value > 220)) {
+                    rowWarnings.push(`Heart rate ${value} seems unusual (expected range: 30-220 bpm)`);
+                  }
+                  break;
+              }
+            }
+          }
+        });
+
+        // Validate gender
+        if (row.gender) {
+          const gender = String(row.gender).trim().toLowerCase();
+          const validGenders = ['male', 'female', 'nam', 'nữ', 'm', 'f'];
+          if (!validGenders.includes(gender)) {
+            rowWarnings.push(`Gender "${row.gender}" may not be recognized (expected: Male/Female/Nam/Nữ)`);
+          }
+        }
+
+        // Validate cohort format
+        if (row.cohort) {
+          const cohort = String(row.cohort).trim();
+          if (cohort.length > 20) {
+            rowErrors.push('Cohort name is too long (max 20 characters)');
+          }
+        }
+
+        // Validate date format
+        if (row.followDate) {
+          const dateValue = row.followDate;
+          let isValidDate = false;
+          
+          if (typeof dateValue === 'number') {
+            // Excel serial date
+            if (dateValue > 0 && dateValue < 100000) {
+              isValidDate = true;
+            }
+          } else if (typeof dateValue === 'string') {
+            const dateStr = dateValue.trim();
+            const dateFormats = [
+              /^\d{4}-\d{2}-\d{2}$/,  // YYYY-MM-DD
+              /^\d{2}\/\d{2}\/\d{4}$/, // DD/MM/YYYY
+              /^\d{2}-\d{2}-\d{4}$/   // DD-MM-YYYY
+            ];
+            
+            if (dateFormats.some(format => format.test(dateStr))) {
+              const testDate = new Date(dateStr);
+              if (!isNaN(testDate.getTime())) {
+                isValidDate = true;
+              }
+            }
+          } else if (dateValue instanceof Date && !isNaN(dateValue.getTime())) {
+            isValidDate = true;
+          }
+          
+          if (!isValidDate) {
+            rowErrors.push(`Invalid date format for followDate: "${dateValue}". Expected format: YYYY-MM-DD`);
+          }
+        }
+
+        // Check for duplicate studentId in the same file
+        const duplicateIndex = data.findIndex((otherRow, otherIndex) => 
+          otherIndex !== index && 
+          String(otherRow.studentId).trim() === String(row.studentId).trim()
+        );
+        if (duplicateIndex !== -1) {
+          rowErrors.push(`Duplicate student ID found at row ${duplicateIndex + 1}`);
+        }
+
+        if (rowErrors.length > 0) {
           invalidRows.push({
-            row: index + 1,
-            missingFields,
-            studentId: row.studentId || 'N/A'
+            row: rowNumber,
+            studentId: row.studentId || 'N/A',
+            errors: rowErrors
           });
         } else {
           validData.push(row);
+          if (rowWarnings.length > 0) {
+            warnings.push({
+              row: rowNumber,
+              studentId: row.studentId,
+              warnings: rowWarnings
+            });
+          }
         }
       });
-  
-      // Note: We'll still process rows with missing optional fields, but with warnings
+
+      // If there are too many invalid rows, reject the import
+      if (invalidRows.length > data.length * 0.5) { // More than 50% invalid
+        return res.status(400).json({
+          success: false,
+          message: `Too many invalid rows (${invalidRows.length}/${data.length}). Please fix the data and try again.`,
+          invalidRows: invalidRows.slice(0, 10), // Show first 10 errors
+          totalInvalidRows: invalidRows.length
+        });
+      }
   
             // Process data and handle upsert (insert or update)
       const existingRecords = await physicalFitnessModel.find({ examSessionId });
@@ -430,13 +624,14 @@ const getPhysicalFitnessStatus = async (req, res) => {
           String(record.studentId) === studentId
         );
 
-        if (existingRecord) {
-          // Update existing record - update all fields including 0 values for numeric fields
-          const fieldsToUpdate = {};
-          const numericFields = ['height', 'weight', 'systolic', 'diastolic', 'heartRate', 'bmi', 'zScoreCC', 'zScoreCN', 'zScoreCNCc'];
-          const evaluationFields = ['danhGiaCC', 'danhGiaCN', 'danhGiaBMI', 'danhGiaTTH', 'danhGiaHeartRate'];
-          
-                      Object.keys(updateData).forEach(key => {
+        try {
+          if (existingRecord) {
+            // Update existing record - update all fields including 0 values for numeric fields
+            const fieldsToUpdate = {};
+            const numericFields = ['height', 'weight', 'systolic', 'diastolic', 'heartRate', 'bmi', 'zScoreCC', 'zScoreCN', 'zScoreCNCc'];
+            const evaluationFields = ['danhGiaCC', 'danhGiaCN', 'danhGiaBMI', 'danhGiaTTH', 'danhGiaHeartRate'];
+            
+            Object.keys(updateData).forEach(key => {
               if (key === 'studentId' || key === 'examSessionId') {
                 fieldsToUpdate[key] = updateData[key];
               } else if (numericFields.includes(key) || evaluationFields.includes(key)) {
@@ -447,45 +642,88 @@ const getPhysicalFitnessStatus = async (req, res) => {
                 fieldsToUpdate[key] = updateData[key];
               }
             });
-          
-          await physicalFitnessModel.findByIdAndUpdate(existingRecord._id, fieldsToUpdate);
-          updatedCount++;
-          updatedStudentIds.push(studentId);
-        } else {
-          // Insert new record
-          await physicalFitnessModel.create(updateData);
-          insertedCount++;
+            
+            await physicalFitnessModel.findByIdAndUpdate(existingRecord._id, fieldsToUpdate);
+            updatedCount++;
+            updatedStudentIds.push(studentId);
+          } else {
+            // Insert new record
+            await physicalFitnessModel.create(updateData);
+            insertedCount++;
+          }
+        } catch (dbError) {
+          console.error(`Database error for student ${studentId}:`, dbError);
+          invalidRows.push({
+            row: data.findIndex(r => String(r.studentId).trim() === studentId) + 1,
+            studentId: studentId,
+            errors: [`Database error: ${dbError.message}`]
+          });
         }
       }
   
       // Clean up uploaded file
-      const fs = await import('fs');
-      if (fs.existsSync(req.file.path)) {
-        fs.unlinkSync(req.file.path);
+      try {
+        const fs = await import('fs');
+        if (fs.existsSync(req.file.path)) {
+          fs.unlinkSync(req.file.path);
+        }
+      } catch (cleanupError) {
+        console.error('Error cleaning up file:', cleanupError);
+        // Don't fail the whole import because of file cleanup error
       }
   
+      // Prepare detailed summary
+      const totalProcessed = insertedCount + updatedCount;
+      const hasErrors = invalidRows.length > 0;
+      const hasWarnings = warnings.length > 0;
+      
       // Return response with detailed information
       const response = {
-        success: true,
-        message: `Import completed successfully!`,
+        success: totalProcessed > 0, // Success if at least one record was processed
+        message: totalProcessed > 0 
+          ? `Import completed! ${totalProcessed} records processed successfully.`
+          : 'Import failed. No records were processed.',
         summary: {
           totalRows: data.length,
           validRows: validData.length,
+          processedRows: totalProcessed,
           insertedCount,
           updatedCount,
-          skippedCount: invalidRows.length
+          errorCount: invalidRows.length,
+          warningCount: warnings.length
         }
       };
   
+      // Add updated student IDs if any
       if (updatedStudentIds.length > 0) {
-        response.updated = updatedStudentIds;
+        response.updated = updatedStudentIds.slice(0, 10); // Limit to first 10 for readability
+        if (updatedStudentIds.length > 10) {
+          response.moreUpdated = updatedStudentIds.length - 10;
+        }
       }
   
-      if (invalidRows.length > 0) {
-        response.invalidRows = invalidRows;
+      // Add error details if any
+      if (hasErrors) {
+        response.errors = {
+          count: invalidRows.length,
+          details: invalidRows.slice(0, 5), // Show first 5 errors
+          hasMore: invalidRows.length > 5
+        };
       }
   
-      res.json(response);
+      // Add warning details if any
+      if (hasWarnings) {
+        response.warnings = {
+          count: warnings.length,
+          details: warnings.slice(0, 5), // Show first 5 warnings
+          hasMore: warnings.length > 5
+        };
+      }
+
+      // Set appropriate HTTP status
+      const statusCode = totalProcessed > 0 ? (hasErrors ? 207 : 200) : 400; // 207 = Multi-Status
+      
+      res.status(statusCode).json(response);
   
     } catch (error) {
       console.error('Import Physical Fitness Excel Error:', error);
@@ -502,9 +740,33 @@ const getPhysicalFitnessStatus = async (req, res) => {
         }
       }
       
-      res.status(500).json({ 
+      // Determine error type and appropriate response
+      let errorMessage = 'Import failed due to an unexpected error';
+      let statusCode = 500;
+      
+      if (error.name === 'ValidationError') {
+        errorMessage = 'Data validation failed: ' + error.message;
+        statusCode = 400;
+      } else if (error.name === 'MongoError' || error.name === 'MongooseError') {
+        errorMessage = 'Database error occurred during import';
+        statusCode = 500;
+      } else if (error.message.includes('ENOENT') || error.message.includes('file')) {
+        errorMessage = 'File processing error: Unable to read the uploaded file';
+        statusCode = 400;
+      } else if (error.message.includes('memory') || error.message.includes('size')) {
+        errorMessage = 'File too large or system memory insufficient';
+        statusCode = 413; // Payload Too Large
+      }
+      
+      res.status(statusCode).json({ 
         success: false, 
-        message: 'Import failed: ' + error.message 
+        message: errorMessage,
+        error: process.env.NODE_ENV === 'development' ? {
+          name: error.name,
+          message: error.message,
+          stack: error.stack?.split('\n').slice(0, 5) // Limited stack trace in dev
+        } : undefined,
+        timestamp: new Date().toISOString()
       });
     }
   };
