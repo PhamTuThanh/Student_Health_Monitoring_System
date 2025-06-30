@@ -24,12 +24,65 @@ function AddStudent() {
   const fileInputRef = useRef(null)
   const [showModal, setShowModal] = useState(false)
 
+  // Function to validate and convert date format
+  const validateAndConvertDate = (dateString) => {
+    if (!dateString) return null;
+    
+    // Remove any extra spaces
+    const cleanDate = dateString.trim();
+    
+    // Check for DD/MM/YYYY format
+    const ddmmyyyyPattern = /^(0[1-9]|[12][0-9]|3[01])\/(0[1-9]|1[0-2])\/(\d{4})$/;
+    const ddmmyyyyMatch = cleanDate.match(ddmmyyyyPattern);
+    
+    // Check for MM/DD/YYYY format
+    const mmddyyyyPattern = /^(0[1-9]|1[0-2])\/(0[1-9]|[12][0-9]|3[01])\/(\d{4})$/;
+    const mmddyyyyMatch = cleanDate.match(mmddyyyyPattern);
+    
+    let day, month, year;
+    
+    if (ddmmyyyyMatch) {
+      // DD/MM/YYYY format
+      day = parseInt(ddmmyyyyMatch[1]);
+      month = parseInt(ddmmyyyyMatch[2]);
+      year = parseInt(ddmmyyyyMatch[3]);
+    } else if (mmddyyyyMatch) {
+      // MM/DD/YYYY format
+      month = parseInt(mmddyyyyMatch[1]);
+      day = parseInt(mmddyyyyMatch[2]);
+      year = parseInt(mmddyyyyMatch[3]);
+    } else {
+      throw new Error('Invalid date format. Please use DD/MM/YYYY or MM/DD/YYYY');
+    }
+    
+    // Validate the date
+    const date = new Date(year, month - 1, day);
+    if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) {
+      throw new Error('Invalid date. Please check the day, month, and year values.');
+    }
+    
+    // Return in YYYY-MM-DD format for backend
+    return `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+  }
+
   const onSubmitHandler = async (event) => {
     event.preventDefault()
     try {
       if (!studentImg) {
         return toast.error('Image Not Selected')
       }
+
+      // Validate and convert date of birth
+      let convertedDob;
+      try {
+        convertedDob = validateAndConvertDate(dob);
+        if (!convertedDob) {
+          return toast.error('Please enter a valid date of birth');
+        }
+      } catch (dateError) {
+        return toast.error(dateError.message);
+      }
+
       const formData = new FormData()
 
       formData.append('image', studentImg)
@@ -40,7 +93,7 @@ function AddStudent() {
       formData.append('studentId', studentId)
       formData.append('about', about)
       formData.append('major', major)
-      formData.append('dob', dob)
+      formData.append('dob', convertedDob)
       formData.append('gender', gender)
       formData.append('address', JSON.stringify({ line1: address1, line2: address2 }))
 
@@ -89,11 +142,11 @@ function AddStudent() {
   //   }
   // };
   return (
-    <form onSubmit={onSubmitHandler} className='m-5 w-full ml-10 max-h-[80vh] overflow-y-scroll'>
-      <div className="flex items-center justify-between ">
+    <form onSubmit={onSubmitHandler} className="max-w-7xl mx-auto p-6 space-y-6 h-[calc(100vh-80px)] overflow-y-auto ml-10 w-[1000px]">
+      <div className="flex items-center justify-between p-5 ">
         <h1 className="text-2xl font-bold text-gray-800">Add Student</h1>
         <button
-          className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded shadow font-medium transition"
+          className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded shadow font-medium transition border-spacing-10"
           onClick={() => setShowModal(true)}
         >
           Import Excel
@@ -171,7 +224,16 @@ function AddStudent() {
 
             <div className='flex-1 flex flex-col gap-1'>
               <p>Date Of Birth</p>
-              <input onChange={(e) => setDob(e.target.value)} value={dob} className="border rounded px-3 py-2" type="date" required />
+              <input 
+                onChange={(e) => setDob(e.target.value)} 
+                value={dob} 
+                className="border rounded px-3 py-2" 
+                type="text" 
+                placeholder="DD/MM/YYYY or MM/DD/YYYY" 
+                pattern="^(0[1-9]|[12][0-9]|3[01])/(0[1-9]|1[0-2])/\d{4}$|^(0[1-9]|1[0-2])/(0[1-9]|[12][0-9]|3[01])/\d{4}$"
+                title="Please enter date in DD/MM/YYYY or MM/DD/YYYY format"
+                required 
+              />
             </div>
             <div className='flex-1 flex flex-col gap-1'>
               <p>Gender</p>

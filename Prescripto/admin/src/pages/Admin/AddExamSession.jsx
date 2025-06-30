@@ -40,7 +40,7 @@ const AddExamSession = () => {
   };
 
   return (
-    <div className="max-w-lg mx-auto mt-10 bg-white p-8 rounded shadow ml-10 h-[calc(100vh-4rem)] overflow-y-auto">
+    <div className="max-w-7xl mx-auto p-6 space-y-6 h-[calc(100vh-80px)] overflow-y-auto ml-10 w-[1000px]">
       <h2 className="text-2xl font-bold mb-6 text-center">Add exam session</h2>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>

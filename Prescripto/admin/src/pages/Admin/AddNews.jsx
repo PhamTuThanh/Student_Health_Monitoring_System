@@ -61,7 +61,7 @@ const AddNews = () => {
     }
     
     return (
-        <div className='min-h-screen bg-gray-50 py-8 px-4 ml-10 max-h-[80vh] overflow-y-scroll pb-20 '>
+        <div className="max-w-7xl mx-auto p-6 space-y-6 h-[calc(100vh-80px)] overflow-y-auto ml-10 w-[1000px]">
             <div className='max-w-2xl mx-auto'>
                 <div className='mb-8'>
                     <h1 className='text-2xl font-semissbold text-gray-900'>Add News</h1>

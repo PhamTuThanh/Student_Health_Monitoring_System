@@ -17,23 +17,22 @@ const AppContextProvider = ({ children }) => {
     const backendUrl = import.meta.env.VITE_BACKEND_URL;
     const [isNavbarVisible, setIsNavbarVisible] = useState(true);
 
+    const fetchUserData = async () => {
+        try {
+            // The dToken cookie will be sent automatically
+            const { data } = await axios.get(`${backendUrl}/api/doctor/profile`);
+            if (data.success) {
+                setUserData(data.profileData);
+            }
+        } catch (error) {
+            // It's normal for this to fail if not logged in as a doctor
+            console.log("Could not fetch doctor profile, probably not logged in.");
+        }
+    };
+
     useEffect(() => {
         // Configure axios to send cookies with requests
         axios.defaults.withCredentials = true;
-
-        const fetchUserData = async () => {
-            try {
-                // The dToken cookie will be sent automatically
-                const { data } = await axios.get(`${backendUrl}/api/doctor/profile`);
-                if (data.success) {
-                    setUserData(data.profileData);
-                }
-            } catch (error) {
-                // It's normal for this to fail if not logged in as a doctor
-                console.log("Could not fetch doctor profile, probably not logged in.");
-            }
-        };
-
         fetchUserData();
     }, [backendUrl]);
 
@@ -65,7 +64,8 @@ const AppContextProvider = ({ children }) => {
         backendUrl,
         isNavbarVisible,
         hideNavbar,
-        showNavbar
+        showNavbar,
+        fetchUserData
     };
 
     return (

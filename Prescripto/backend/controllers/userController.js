@@ -704,7 +704,10 @@ const getAbnormalityByStudentId = async (req, res) => {
 const getPrescriptionByStudentId = async (req, res) => {
     try {
         const { studentId } = req.params;
-        const prescriptions = await prescriptionModel.find({ studentId }).sort({ prescriptionDate: -1 });
+        const prescriptions = await prescriptionModel
+            .find({ studentId })
+            .populate('medicines.drugId', 'drugName drugCode drugUnit')
+            .sort({ prescriptionDate: -1 });
         res.json({ success: true, data: prescriptions });
     } catch (error) {
         console.error('Error getting prescription:', error); 

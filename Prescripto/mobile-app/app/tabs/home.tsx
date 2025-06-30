@@ -413,7 +413,7 @@ const StudentHealthDashboard: React.FC = () => {
               
               <View style={styles.welcomeContent}>
                 <Text style={styles.welcomeMessage}>
-                  To start tracking your health, you need to perform your first health check at UTC2 Health Center.
+                  To start tracking your health, you need to perform your first health check at UTC2 Health Department
                 </Text>
                 
                 <View style={styles.instructionSteps}>
@@ -423,7 +423,7 @@ const StudentHealthDashboard: React.FC = () => {
                     </View>
                     <View style={styles.stepContent}>
                       <Text style={styles.stepTitle}>Register for a health check</Text>
-                      <Text style={styles.stepDescription}>Contact the Health Center to schedule an appointment</Text>
+                      <Text style={styles.stepDescription}>Contact the Health Department to more information</Text>
                     </View>
                   </View>
                   
@@ -736,7 +736,7 @@ const StudentHealthDashboard: React.FC = () => {
             </View>
             <TouchableOpacity style={styles.reminderButton} onPress={handleContactHealthCenter}>
               <Ionicons name="chatbubble-outline" size={16} color="white" />
-              <Text style={styles.reminderButtonText}>Contact for Appointment</Text>
+              <Text style={styles.reminderButtonText}>Contact to more information</Text>
             </TouchableOpacity>
           </View>
 

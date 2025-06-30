@@ -195,7 +195,7 @@ export default function AbnormalityDetail() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 p-6 h-[calc(100vh-40px)] overflow-y-auto">
+    <div className="max-w-7xl mx-auto p-6 space-y-6 h-[calc(100vh-80px)] overflow-y-auto ml-10 w-[1000px]">
       <div className="max-w-7xl mx-auto">
         {/* Header Section */}
         <div className="bg-white rounded-2xl shadow-lg border border-blue-100 p-8 mb-8">

@@ -151,8 +151,9 @@ const Sidebar = () => {
                 toggleDropdown={() => setOpenCalendar(!openCalendar)}
               >
                 <StyledNavLink to="/add-exam-session" icon={assets.calendar_icon} label="Add Exam Session" />
-                <StyledNavLink to="/exam-session-list" icon={assets.calendar_icon} label="Exam Session List" />
+                <StyledNavLink to="/exam-session-manager" icon={assets.calendar_icon} label="Lock Management" />
               </DropdownMenu>
+              <StyledNavLink to="/health-data-manager" icon={assets.data_analysis_icon} label="Health Data Management" />
             </ul>
           </div>
         )}
@@ -190,6 +191,7 @@ const Sidebar = () => {
               </DropdownMenu> */}
               <StyledNavLink to="/drug_stock" icon={assets.drug_stock_icon} label="Drug Stock" />  
               <StyledNavLink to="/data_analysis" icon={assets.data_analysis_icon} label="Data Analysis" />
+              <StyledNavLink to="/my-edit-requests" icon={assets.application_icon} label="Edit Requests" />
               <StyledNavLink to="/doctor_chat" icon={assets.chat_icon} label="Chat" />
             </ul>
           </div>

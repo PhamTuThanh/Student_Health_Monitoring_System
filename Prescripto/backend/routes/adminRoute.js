@@ -1,5 +1,34 @@
 import express from 'express';
-import { addDoctor, allDoctors, loginAdmin, appoinmentsAdmin, appoinmentCancel, adminDashboard, deleteDoctor, addStudent, listStudents, importStudentsExcel, addNews, getNews, updateNews, deleteNews, createExamSession, logoutAdmin, deleteStudent } from '../controllers/adminController.js';
+import { 
+    addDoctor, 
+    allDoctors, 
+    loginAdmin, 
+    appoinmentsAdmin, 
+    appoinmentCancel, 
+    adminDashboard, 
+    deleteDoctor, 
+    addStudent, 
+    listStudents, 
+    importStudentsExcel, 
+    addNews, 
+    getNews, 
+    updateNews, 
+    deleteNews, 
+    createExamSession, 
+    logoutAdmin, 
+    deleteStudent,
+    // Lock Management functions
+    getExamSessionsWithData,
+    toggleExamSessionLock,
+    getEditRequests,
+    handleEditRequest,
+    revokeTempUnlock,
+    getPhysicalFitnessBySession,
+    // Additional admin functions
+    getAllPhysicalFitness,
+    getAllAbnormality,
+    getListExamSession
+} from '../controllers/adminController.js';
 import upload from '../middlewares/multer.js';
 import authAdmin from '../middlewares/authAdmin.js';
 import {changeAvailability } from '../controllers/doctorController.js';
@@ -25,5 +54,18 @@ adminRouter.get('/get-news', authAdmin, getNews)
 adminRouter.post('/update-news', authAdmin, upload.single('file'), updateNews)
 adminRouter.post('/delete-news' , authAdmin, deleteNews)
 adminRouter.post('/add-exam-session', authAdmin, createExamSession)
+
+//--------------------Lock Management Routes--------------------
+adminRouter.get('/exam-sessions-data', authAdmin, getExamSessionsWithData)
+adminRouter.post('/toggle-exam-session-lock', authAdmin, toggleExamSessionLock)
+adminRouter.get('/edit-requests', authAdmin, getEditRequests)
+adminRouter.post('/handle-edit-request', authAdmin, handleEditRequest)
+adminRouter.post('/revoke-temp-unlock', authAdmin, revokeTempUnlock)
+adminRouter.get('/physical-fitness-by-session', authAdmin, getPhysicalFitnessBySession)
+
+// Additional admin functions
+adminRouter.get('/all-physical-fitness', authAdmin, getAllPhysicalFitness)
+adminRouter.get('/all-abnormality', authAdmin, getAllAbnormality)
+adminRouter.get('/list-exam-session', authAdmin, getListExamSession)
 
 export default adminRouter;

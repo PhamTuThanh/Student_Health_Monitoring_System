@@ -27,6 +27,9 @@ import AddNews from './pages/Admin/AddNews';
 import DoctorChat from './pages/Doctor/DoctorChat';
 import NewsList from './pages/Admin/NewsList';
 import AddExamSession from './pages/Admin/AddExamSession';
+import ExamSessionManager from './pages/Admin/ExamSessionManager';
+import MyEditRequests from './pages/Doctor/MyEditRequests';
+import HealthDataManager from './pages/Admin/HealthDataManager';
 
 const App = () => {
   const { aToken } = useContext(AdminContext)
@@ -98,7 +101,8 @@ const App = () => {
               <Route path='/add-news' element={<AddNews/>}/>
               <Route path='/news-list' element={<NewsList/>}/>
               <Route path='/add-exam-session' element={<AddExamSession/>}/>
-
+              <Route path='/exam-session-manager' element={<ExamSessionManager/>}/>
+              <Route path='/health-data-manager' element={<HealthDataManager/>}/>
               <Route path='/doctor' element={<Navigate to="/doctor-dashboard" replace />}/>
               <Route path='/doctor-dashboard' element={<DoctorDashboard/>}/>
               <Route path='/doctor-appoinments' element={<DoctorAppoinments/>}/>
@@ -110,6 +114,7 @@ const App = () => {
               <Route path="/drug_stock" element={<DrugStock/>}/>
               <Route path="/add-drug" element={<AddDrug/>}/>
               <Route path="/doctor_chat" element={<DoctorChat/>}/>
+              <Route path="/my-edit-requests" element={<MyEditRequests/>}/>
             </Routes>
           </div>
         </div>

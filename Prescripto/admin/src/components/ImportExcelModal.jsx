@@ -49,8 +49,14 @@ const ImportExcelModal = ({ open, onClose, templateUrl, type = 'students', examS
       return;
     }
 
-    if (type === 'physical-fitness' && !examSessionId) {
+    // Debug logging
+    console.log('Import Debug - Type:', type);
+    console.log('Import Debug - examSessionId:', examSessionId);
+    console.log('Import Debug - examSessionId type:', typeof examSessionId);
+
+    if (type === 'physical-fitness' && (!examSessionId || examSessionId === '')) {
       toast.error('Please select an exam session first!');
+      console.error('Import failed: examSessionId is missing or empty');
       return;
     }
 
@@ -75,6 +81,8 @@ const ImportExcelModal = ({ open, onClose, templateUrl, type = 'students', examS
         if(dToken) headers.dToken = dToken;
         endpoint = `${backendUrl}/api/doctor/import-physical-fitness-excel`;
         formData.append('examSessionId', examSessionId);
+        console.log('Import Debug - FormData examSessionId appended:', examSessionId);
+        console.log('Import Debug - Endpoint:', endpoint);
       } else {
         toast.error("Invalid import type.");
         setLoading(false);

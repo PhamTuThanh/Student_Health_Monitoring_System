@@ -5,6 +5,7 @@ import { DoctorContext } from "../../context/DoctorContext";
 import * as XLSX from 'xlsx';
 import { saveAs } from "file-saver";
 import ImportExcelModal from "../../components/ImportExcelModal";
+import EditRequestModal from "./EditRequestModal";
 
 
 // Utility functions for calculations
@@ -74,6 +75,7 @@ const exportToExcel = (data, filename) => {
 };
 
 export default function PhysicalFitness() {
+  const { dToken } = useContext(DoctorContext);
   const [rows, setRows] = useState([]);
   const [filteredRows, setFilteredRows] = useState([]);
   const [selectedYear, setSelectedYear] = useState("");
@@ -90,6 +92,12 @@ export default function PhysicalFitness() {
   const [autoSelected, setAutoSelected] = useState(false);
   const backendUrl = import.meta.env.VITE_BACKEND_URL;
   const [isModalOpen, setIsModalOpen] = useState(false);
+  
+  // Lock Management States
+  const [editPermission, setEditPermission] = useState({ canEdit: true, reason: '', isLocked: false });
+  const [showEditRequestModal, setShowEditRequestModal] = useState(false);
+  const [selectedExamSession, setSelectedExamSession] = useState(null);
+  const [isCheckingPermission, setIsCheckingPermission] = useState(false);
 
   const getAcademicYears = (range = 2) => {
     const currentYear = new Date().getFullYear();
@@ -101,7 +109,6 @@ export default function PhysicalFitness() {
     }
     return years;
   };
-  const academicYears = getAcademicYears(2);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -280,138 +287,138 @@ export default function PhysicalFitness() {
     }
   };
 
-  const handleImportExcel = async () => {
-    const file = fileInputRef.current.files[0];
-    if (!file) {
-      toast.error('Please select an Excel file!');
-      return;
-    }
-    if (!examSessionId) {
-      toast.error('Please select an exam session first!');
-      return;
-    }
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('examSessionId', examSessionId);
-    try {
-      setLoading(true);
-      const response = await axios.post(
-        `${backendUrl}/api/doctor/import-physical-fitness-excel`,
-        formData,
-        {
-          headers: {
-            'Content-Type': 'multipart/form-data'
-          }
-        }
-      );
-      if (response.data.success || response.status === 207) {
-        const { summary, updated, errors, warnings } = response.data;
+  // const handleImportExcel = async () => {
+  //   const file = fileInputRef.current.files[0];
+  //   if (!file) {
+  //     toast.error('Please select an Excel file!');
+  //     return;
+  //   }
+  //   if (!examSessionId) {
+  //     toast.error('Please select an exam session first!');
+  //     return;
+  //   }
+  //   const formData = new FormData();
+  //   formData.append('file', file);
+  //   formData.append('examSessionId', examSessionId);
+  //   try {
+  //     setLoading(true);
+  //     const response = await axios.post(
+  //       `${backendUrl}/api/doctor/import-physical-fitness-excel`,
+  //       formData,
+  //       {
+  //         headers: {
+  //           'Content-Type': 'multipart/form-data'
+  //         }
+  //       }
+  //     );
+  //     if (response.data.success || response.status === 207) {
+  //       const { summary, updated, errors, warnings } = response.data;
         
-        // Create detailed success message
-        let message = `✅ Import completed successfully!\n\n`;
-        message += `📊 Summary:\n`;
-        message += `• Total rows processed: ${summary.totalRows}\n`;
-        message += `• Valid rows: ${summary.validRows}\n`;
-        message += `• New records created: ${summary.insertedCount}\n`;
-        message += `• Existing records updated: ${summary.updatedCount}\n`;
+  //       // Create detailed success message
+  //       let message = `✅ Import completed successfully!\n\n`;
+  //       message += `📊 Summary:\n`;
+  //       message += `• Total rows processed: ${summary.totalRows}\n`;
+  //       message += `• Valid rows: ${summary.validRows}\n`;
+  //       message += `• New records created: ${summary.insertedCount}\n`;
+  //       message += `• Existing records updated: ${summary.updatedCount}\n`;
         
-        if (summary.errorCount > 0) {
-          message += `• Errors: ${summary.errorCount}\n`;
-        }
-        if (summary.warningCount > 0) {
-          message += `• Warnings: ${summary.warningCount}\n`;
-        }
+  //       if (summary.errorCount > 0) {
+  //         message += `• Errors: ${summary.errorCount}\n`;
+  //       }
+  //       if (summary.warningCount > 0) {
+  //         message += `• Warnings: ${summary.warningCount}\n`;
+  //       }
 
-        // Show updated student IDs (limited)
-        if (updated && updated.length > 0) {
-          message += `\n📝 Updated students: ${updated.join(', ')}`;
-          if (response.data.moreUpdated) {
-            message += ` (+${response.data.moreUpdated} more)`;
-          }
-        }
+  //       // Show updated student IDs (limited)
+  //       if (updated && updated.length > 0) {
+  //         message += `\n📝 Updated students: ${updated.join(', ')}`;
+  //         if (response.data.moreUpdated) {
+  //           message += ` (+${response.data.moreUpdated} more)`;
+  //         }
+  //       }
 
-        // Show warnings if any
-        if (warnings && warnings.details && warnings.details.length > 0) {
-          message += `\n\n⚠️ Warnings (${warnings.count}):\n`;
-          warnings.details.forEach(w => {
-            message += `• Row ${w.row} (${w.studentId}): ${w.warnings.join(', ')}\n`;
-          });
-          if (warnings.hasMore) {
-            message += `... and ${warnings.count - warnings.details.length} more warnings\n`;
-          }
-        }
+  //       // Show warnings if any
+  //       if (warnings && warnings.details && warnings.details.length > 0) {
+  //         message += `\n\n⚠️ Warnings (${warnings.count}):\n`;
+  //         warnings.details.forEach(w => {
+  //           message += `• Row ${w.row} (${w.studentId}): ${w.warnings.join(', ')}\n`;
+  //         });
+  //         if (warnings.hasMore) {
+  //           message += `... and ${warnings.count - warnings.details.length} more warnings\n`;
+  //         }
+  //       }
 
-        // Show errors if any
-        if (errors && errors.details && errors.details.length > 0) {
-          message += `\n\n❌ Errors (${errors.count}):\n`;
-          errors.details.forEach(e => {
-            message += `• Row ${e.row} (${e.studentId}): ${e.errors.join(', ')}\n`;
-          });
-          if (errors.hasMore) {
-            message += `... and ${errors.count - errors.details.length} more errors\n`;
-          }
-        }
+  //       // Show errors if any
+  //       if (errors && errors.details && errors.details.length > 0) {
+  //         message += `\n\n❌ Errors (${errors.count}):\n`;
+  //         errors.details.forEach(e => {
+  //           message += `• Row ${e.row} (${e.studentId}): ${e.errors.join(', ')}\n`;
+  //         });
+  //         if (errors.hasMore) {
+  //           message += `... and ${errors.count - errors.details.length} more errors\n`;
+  //         }
+  //       }
 
-        // Choose appropriate toast type
-        if (summary.errorCount > 0 || summary.warningCount > 0) {
-          toast.warn(message, { autoClose: 12000 });
-        } else {
-          toast.success(message, { autoClose: 8000 });
-        }
+  //       // Choose appropriate toast type
+  //       if (summary.errorCount > 0 || summary.warningCount > 0) {
+  //         toast.warn(message, { autoClose: 12000 });
+  //       } else {
+  //         toast.success(message, { autoClose: 8000 });
+  //       }
 
-        // Refresh data if any records were processed
-        if (summary.insertedCount > 0 || summary.updatedCount > 0) {
-          await refreshData();
-        }
+  //       // Refresh data if any records were processed
+  //       if (summary.insertedCount > 0 || summary.updatedCount > 0) {
+  //         await refreshData();
+  //       }
         
-        // Log detailed info to console for debugging
-        console.log('Import Results:', {
-          summary,
-          updated,
-          errors: errors?.details,
-          warnings: warnings?.details
-        });
+  //       // Log detailed info to console for debugging
+  //       console.log('Import Results:', {
+  //         summary,
+  //         updated,
+  //         errors: errors?.details,
+  //         warnings: warnings?.details
+  //       });
         
-      } else {
-        toast.error(response.data.message || 'Import failed');
-      }
-    } catch (err) {
-      const errorData = err.response?.data;
-      let errorMessage = 'Import error: ';
+  //     } else {
+  //       toast.error(response.data.message || 'Import failed');
+  //     }
+  //   } catch (err) {
+  //     const errorData = err.response?.data;
+  //     let errorMessage = 'Import error: ';
       
-      if (errorData?.message) {
-        errorMessage += errorData.message;
-      } else {
-        errorMessage += err.message;
-      }
+  //     if (errorData?.message) {
+  //       errorMessage += errorData.message;
+  //     } else {
+  //       errorMessage += err.message;
+  //     }
 
-      // Handle specific error cases
-      if (err.response?.status === 413) {
-        errorMessage = 'File quá lớn! Vui lòng chọn file nhỏ hơn 10MB.';
-      } else if (err.response?.status === 400 && errorData?.invalidRows) {
-        errorMessage += `\n\nChi tiết lỗi:`;
-        errorData.invalidRows.slice(0, 3).forEach(row => {
-          errorMessage += `\nDòng ${row.row}: ${row.errors?.join(', ') || 'Lỗi không xác định'}`;
-        });
+  //     // Handle specific error cases
+  //     if (err.response?.status === 413) {
+  //       errorMessage = 'File quá lớn! Vui lòng chọn file nhỏ hơn 10MB.';
+  //     } else if (err.response?.status === 400 && errorData?.invalidRows) {
+  //       errorMessage += `\n\nChi tiết lỗi:`;
+  //       errorData.invalidRows.slice(0, 3).forEach(row => {
+  //         errorMessage += `\nDòng ${row.row}: ${row.errors?.join(', ') || 'Lỗi không xác định'}`;
+  //       });
         
-        if (errorData.totalInvalidRows > 3) {
-          errorMessage += `\n... và ${errorData.totalInvalidRows - 3} lỗi khác`;
-        }
-      }
+  //       if (errorData.totalInvalidRows > 3) {
+  //         errorMessage += `\n... và ${errorData.totalInvalidRows - 3} lỗi khác`;
+  //       }
+  //     }
 
-      toast.error(errorMessage, { autoClose: 10000 });
+  //     toast.error(errorMessage, { autoClose: 10000 });
       
-      // Log detailed error info for debugging
-      if (errorData) {
-        console.error('Import Error Details:', errorData);
-      }
-    } finally {
-      setLoading(false);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
-    }
-  };
+  //     // Log detailed error info for debugging
+  //     if (errorData) {
+  //       console.error('Import Error Details:', errorData);
+  //     }
+  //   } finally {
+  //     setLoading(false);
+  //     if (fileInputRef.current) {
+  //       fileInputRef.current.value = '';
+  //     }
+  //   }
+  // };
 
   const refreshData = async () => {
     try {
@@ -587,7 +594,15 @@ export default function PhysicalFitness() {
           </div>
           <div className="flex items-center gap-2">
             <button
-              onClick={() => setIsModalOpen(true)}
+              onClick={() => {
+                console.log('Debug - Opening import modal with examSessionId:', examSessionId);
+                console.log('Debug - examSessionId type:', typeof examSessionId);
+                if (!examSessionId || examSessionId === '' || examSessionId === 'No exam session') {
+                  toast.error('Please select an academic year first!');
+                  return;
+                }
+                setIsModalOpen(true);
+              }}
               className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-1.5 rounded"
               disabled={loading || !examSessionId}
             >
@@ -599,6 +614,13 @@ export default function PhysicalFitness() {
               disabled={!examSessionId}
             >
               Export Excel
+            </button>
+            <button
+              onClick={() => setShowEditRequestModal(true)}
+              className="bg-red-500 hover:bg-red-600 text-white px-4 py-1.5 rounded"
+              disabled={!examSessionId}
+            > 
+              Edit Request
             </button>
           </div>
         </div>
@@ -752,7 +774,15 @@ export default function PhysicalFitness() {
           </div>  
         </div>
       </div>
-   
+      <EditRequestModal
+        isOpen={showEditRequestModal}
+        onClose={() => setShowEditRequestModal(false)}
+        examSessionId={examSessions.find(session => session._id === examSessionId) || { _id: examSessionId }}
+        onRequestSent={() => {
+          setShowEditRequestModal(false);
+          refreshData();
+        }}
+      />
     </div>
   );
 }

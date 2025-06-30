@@ -10,7 +10,9 @@
     "test-email": "node test-email.js",
     "test-forgot-password": "node test-forgot-password.js",
     "test-new-password": "node test-new-password.js",
-    "test-full-forgot-password": "node test-full-forgot-password.js"
+    "test-full-forgot-password": "node test-full-forgot-password.js",
+    "cleanup-duplicates": "node scripts/cleanupDuplicatePhysicalFitness.js",
+    "remove-debug-logs": "node scripts/removeDebugLogs.js"
   },
   "author": "",
   "license": "ISC",

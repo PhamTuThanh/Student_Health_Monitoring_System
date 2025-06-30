@@ -10,9 +10,9 @@ import xlsx from 'xlsx';
 import drugStockModel from '../models/drugStockModel.js';
 import cloudinary from 'cloudinary';
 import examSessionModel from '../models/examSessionModel.js';
-import mongoose from 'mongoose';
 import prescriptionModel from '../models/prescriptionModel.js';
 import { normalizeCohort } from '../utils/normalize.js';
+import EditRequest from '../models/editRequestModel.js';
 
 const changeAvailability = async (req, res) => {
     try {
@@ -333,8 +333,14 @@ const getPhysicalFitnessStatus = async (req, res) => {
     try {
       const { examSessionId } = req.body;
       
+      // Debug logging
+      console.log('Backend Debug - req.body:', req.body);
+      console.log('Backend Debug - examSessionId:', examSessionId);
+      console.log('Backend Debug - examSessionId type:', typeof examSessionId);
+      
       // Validate examSessionId
       if (!examSessionId) {
+        console.error('Backend Error - examSessionId is missing from request body');
         return res.status(400).json({ success: false, message: 'Exam session ID is required' });
       }
       
@@ -366,6 +372,30 @@ const getPhysicalFitnessStatus = async (req, res) => {
       const examSession = await examSessionModel.findById(examSessionId);
       if (!examSession) {
         return res.status(400).json({ success: false, message: 'Exam session not found' });
+      }
+
+      // Check edit permission for this exam session
+      const doctorId = req.user._id;
+      
+      // Nếu exam session bị lock, check permission
+      if (examSession.isLocked) {
+        // Check xem có temporary unlock không
+        const activeRequest = await EditRequest.findOne({
+          examSessionId: examSessionId,
+          requestedBy: doctorId,
+          status: 'approved',
+          tempUnlockUntil: { $gt: new Date() }
+        });
+
+        if (!activeRequest) {
+          return res.status(403).json({ 
+            success: false, 
+            message: "This exam session is locked. Please request edit access from admin.",
+            lockReason: examSession.lockReason,
+            lockedAt: examSession.lockedAt,
+            isLocked: true
+          });
+        }
       }
   
       let xlsx, workbook, data;
@@ -574,13 +604,31 @@ const getPhysicalFitnessStatus = async (req, res) => {
       }
   
             // Process data and handle upsert (insert or update)
-      const existingRecords = await physicalFitnessModel.find({ examSessionId });
       let insertedCount = 0;
       let updatedCount = 0;
       const updatedStudentIds = [];
   
       for (const row of validData) {
         const studentId = String(row.studentId).replace(/^['"]+|['"]+$/g, '').trim();
+        
+        // Additional validation for studentId
+        if (!studentId || studentId === 'undefined' || studentId === 'null') {
+          console.error(`Invalid studentId found:`, row.studentId);
+          invalidRows.push({
+            row: data.findIndex(r => r === row) + 1,
+            studentId: row.studentId || 'N/A',
+            errors: ['Invalid or empty studentId']
+          });
+          continue;
+        }
+        
+        // Debug logging
+        console.log(`\n=== Processing Row for StudentId: ${studentId} ===`);
+        console.log('Raw studentId from Excel:', row.studentId);
+        console.log('Processed studentId:', studentId);
+        console.log('StudentId type:', typeof studentId);
+        console.log('StudentId length:', studentId.length);
+        console.log('ExamSessionId:', examSessionId);
         
         // Calculate derived fields - use 0 as default for empty numeric fields
         const height = row.height !== undefined && row.height !== null && row.height !== "" ? parseFloat(row.height) || 0 : 0;
@@ -598,8 +646,8 @@ const getPhysicalFitnessStatus = async (req, res) => {
         const cohort = row.cohort ? normalizeCohort(row.cohort) : "";
 
         const updateData = {
-          studentId,
-          examSessionId,
+          studentId: String(studentId), // Ensure it's always a string
+          examSessionId: examSessionId, // Let Mongoose handle ObjectId conversion
           cohort,
           gender: row.gender || "",
           followDate: row.followDate || "",
@@ -619,37 +667,48 @@ const getPhysicalFitnessStatus = async (req, res) => {
           danhGiaHeartRate: heartRate > 0 ? getDanhGiaHeartRate(heartRate) : "",
         };
 
-        // Check if record already exists
-        const existingRecord = existingRecords.find(record => 
-          String(record.studentId) === studentId
-        );
+        console.log('UpdateData studentId:', updateData.studentId);
+        console.log('UpdateData examSessionId:', updateData.examSessionId);
 
         try {
+          // Check if record exists before upsert - use ObjectId for examSessionId
+          const existingRecord = await physicalFitnessModel.findOne({ 
+            studentId: String(studentId), 
+            examSessionId: examSessionId 
+          });
+
+          console.log('Existing record found:', existingRecord ? 'YES' : 'NO');
           if (existingRecord) {
-            // Update existing record - update all fields including 0 values for numeric fields
-            const fieldsToUpdate = {};
-            const numericFields = ['height', 'weight', 'systolic', 'diastolic', 'heartRate', 'bmi', 'zScoreCC', 'zScoreCN', 'zScoreCNCc'];
-            const evaluationFields = ['danhGiaCC', 'danhGiaCN', 'danhGiaBMI', 'danhGiaTTH', 'danhGiaHeartRate'];
-            
-            Object.keys(updateData).forEach(key => {
-              if (key === 'studentId' || key === 'examSessionId') {
-                fieldsToUpdate[key] = updateData[key];
-              } else if (numericFields.includes(key) || evaluationFields.includes(key)) {
-                // Always update numeric and evaluation fields, even if they are 0 or empty
-                fieldsToUpdate[key] = updateData[key];
-              } else if (updateData[key] !== "" && updateData[key] !== null && updateData[key] !== undefined) {
-                // For other fields, only update if they have data
-                fieldsToUpdate[key] = updateData[key];
-              }
-            });
-            
-            await physicalFitnessModel.findByIdAndUpdate(existingRecord._id, fieldsToUpdate);
+            console.log('Existing record _id:', existingRecord._id);
+            console.log('Existing record studentId:', existingRecord.studentId);
+            console.log('StudentId match:', existingRecord.studentId === String(studentId));
+          }
+
+          // Use findOneAndUpdate with upsert for proper upsert behavior
+          const result = await physicalFitnessModel.findOneAndUpdate(
+            { 
+              studentId: String(studentId), 
+              examSessionId: examSessionId 
+            },
+            { $set: updateData },
+            { 
+              new: true,
+              upsert: true,
+              setDefaultsOnInsert: true
+            }
+          );
+
+          console.log('Result _id:', result._id);
+          console.log('Result studentId:', result.studentId);
+
+          // Properly track insert vs update
+          if (existingRecord) {
             updatedCount++;
             updatedStudentIds.push(studentId);
+            console.log('Operation: UPDATE');
           } else {
-            // Insert new record
-            await physicalFitnessModel.create(updateData);
             insertedCount++;
+            console.log('Operation: INSERT');
           }
         } catch (dbError) {
           console.error(`Database error for student ${studentId}:`, dbError);
@@ -1108,6 +1167,222 @@ const getPrescriptionByAbnormalityId = async (req, res) => {
     }
 };
 
+//--------------------Doctor Lock Management--------------------
+
+// API để check edit permission cho exam session
+const checkEditPermission = async (req, res) => {
+    try {
+        const { examSessionId } = req.params;
+        const doctorId = req.user._id;
+        
+        if (!examSessionId) {
+            return res.status(400).json({ 
+                success: false, 
+                message: "Exam session ID is required" 
+            });
+        }
+
+        const examSession = await examSessionModel.findById(examSessionId);
+        if (!examSession) {
+            return res.status(404).json({ 
+                success: false, 
+                message: "Exam session not found" 
+            });
+        }
+
+        // Nếu exam session không bị lock, cho phép edit
+        if (!examSession.isLocked) {
+            return res.json({ 
+                success: true, 
+                canEdit: true,
+                reason: "Exam session is not locked"
+            });
+        }
+
+        // Check xem có temporary unlock không
+        const activeRequest = await EditRequest.findOne({
+            examSessionId: examSessionId,
+            doctorId: doctorId,
+            status: 'approved',
+            tempUnlockUntil: { $gt: new Date() }
+        });
+
+        if (activeRequest) {
+            return res.json({ 
+                success: true, 
+                canEdit: true,
+                reason: "Temporary unlock is active",
+                tempUnlockUntil: activeRequest.tempUnlockUntil
+            });
+        }
+
+        return res.json({ 
+            success: true, 
+            canEdit: false,
+            reason: "Exam session is locked",
+            lockReason: examSession.lockReason,
+            lockedAt: examSession.lockedAt
+        });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+// API để request edit access
+const requestEditAccess = async (req, res) => {
+    try {
+        const { examSessionId, reason } = req.body;
+        const doctorId = req.user._id;
+        
+        if (!examSessionId || !reason) {
+            return res.status(400).json({ 
+                success: false, 
+                message: "Exam session ID and reason are required" 
+            });
+        }
+
+        const examSession = await examSessionModel.findById(examSessionId);
+        if (!examSession) {
+            return res.status(404).json({ 
+                success: false, 
+                message: "Exam session not found" 
+            });
+        }
+
+        if (!examSession.isLocked) {
+            return res.status(400).json({ 
+                success: false, 
+                message: "Exam session is not locked, no need to request access" 
+            });
+        }
+
+        // Check xem đã có request pending chưa
+        const existingRequest = await EditRequest.findOne({
+            examSessionId: examSessionId,
+            requestedBy: doctorId,
+            status: 'pending'
+        });
+
+        if (existingRequest) {
+            return res.status(400).json({ 
+                success: false, 
+                message: "You already have a pending request for this exam session" 
+            });
+        }
+
+        // Create new edit request
+        const editRequest = new EditRequest({
+            examSessionId: examSessionId,
+            requestedBy: doctorId,
+            reason: reason,
+            status: 'pending'
+        });
+
+        await editRequest.save();
+
+        res.json({ 
+            success: true, 
+            message: "Edit request submitted successfully",
+            editRequest: editRequest
+        });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+// API để lấy danh sách edit requests của doctor
+const getMyEditRequests = async (req, res) => {
+    try {
+        const doctorId = req.user._id;
+        const { status, page = 1, limit = 10 } = req.query;
+        
+        let filter = { requestedBy: doctorId };
+        if (status && status !== 'all') {
+            filter.status = status;
+        }
+
+        const skip = (page - 1) * limit;
+        
+        const editRequests = await EditRequest.find(filter)
+            .populate('examSessionId', 'examSessionName examSessionDate examSessionAcademicYear')
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(parseInt(limit));
+
+        const total = await EditRequest.countDocuments(filter);
+
+        res.json({ 
+            success: true, 
+            editRequests,
+            pagination: {
+                current: parseInt(page),
+                total: Math.ceil(total / limit),
+                count: editRequests.length,
+                totalRecords: total
+            }
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+// API để cancel edit request (chỉ cho pending requests)
+const cancelEditRequest = async (req, res) => {
+    try {
+        const { requestId } = req.body;
+        const doctorId = req.user._id;
+        
+        if (!requestId) {
+            return res.status(400).json({ 
+                success: false, 
+                message: "Request ID is required" 
+            });
+        }
+
+        const editRequest = await EditRequest.findOne({
+            _id: requestId,
+            requestedBy: doctorId
+        });
+        
+        if (!editRequest) {
+            return res.status(404).json({ 
+                success: false, 
+                message: "Edit request not found" 
+            });
+        }
+
+        if (editRequest.status !== 'pending') {
+            return res.status(400).json({ 
+                success: false, 
+                message: "Can only cancel pending requests" 
+            });
+        }
+
+        const updatedRequest = await EditRequest.findByIdAndUpdate(
+            requestId,
+            { 
+                status: 'cancelled',
+                cancelledAt: new Date()
+            },
+            { new: true }
+        );
+
+        res.json({ 
+            success: true, 
+            message: "Edit request cancelled successfully",
+            editRequest: updatedRequest
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
 export {
     changeAvailability, doctorList, loginDoctor, appoinmentsDoctor,
     appoinmentCancel, appoinmentComplete,doctorDashboard,doctorProfile,
@@ -1121,6 +1396,11 @@ export {
     getListExamSession,
     logoutDoctor,
     addPrescription,
-    getPrescriptionByStudentId, getPrescriptionByAbnormalityId
+    getPrescriptionByStudentId, getPrescriptionByAbnormalityId,
+    // Lock Management APIs
+    checkEditPermission,
+    requestEditAccess,
+    getMyEditRequests,
+    cancelEditRequest
 }
 

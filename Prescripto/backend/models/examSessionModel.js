@@ -22,6 +22,21 @@ const examSessionSchema = new mongoose.Schema({
     examSessionCreatedAt: {
         type: Date,
         default: Date.now
+    },
+    // Lock Management Fields
+    isLocked: {
+        type: Boolean,
+        default: false
+    },
+    lockedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Admin"
+    },
+    lockedAt: {
+        type: Date
+    },
+    lockReason: {
+        type: String
     }
 });
 

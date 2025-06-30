@@ -10,6 +10,8 @@ import xlsx from 'xlsx';
 import News from '../models/newsModel.js';
 import ExamSession from "../models/examSessionModel.js";
 import physicalFitnessModel from "../models/physicalFitnessModel.js";
+import EditRequest from "../models/editRequestModel.js";
+import abnormalityModel from "../models/abnormalityModel.js";
 // import { normalizeCohort } from '../utils/normalize.js';
 
 
@@ -442,7 +444,7 @@ const createExamSession = async (req, res) => {
       danhGiaHeartRate: "",
     }));
     await physicalFitnessModel.insertMany(emptyRecords);
-    res.status(201).json({ success: true, message: "Tạo lần khám và bản ghi rỗng thành công!", examSession });
+    res.status(201).json({ success: true, message: "Create exam session and empty records successfully", examSession });
   } catch (error) {
     console.error("Error creating exam session:", error);
     res.status(500).json({ success: false, message: error.message });
@@ -479,4 +481,290 @@ const deleteStudent = async (req, res) => {
     }
 };
 
-export { addDoctor, loginAdmin, logoutAdmin, allDoctors, appoinmentsAdmin, appoinmentCancel, adminDashboard, deleteDoctor, addStudent, listStudents, importStudentsExcel, addNews, getNews, updateNews, deleteNews, createExamSession, deleteStudent };
+//--------------------Exam Session Lock Management--------------------
+
+// API để lấy danh sách exam sessions với thông tin physical fitness data
+const getExamSessionsWithData = async (req, res) => {
+    try {
+        const examSessions = await ExamSession.find({}).sort({ createdAt: -1 });
+        
+        const sessionsWithStats = await Promise.all(
+            examSessions.map(async (session) => {
+                const fitnessData = await physicalFitnessModel.find({ examSessionId: session._id });
+                const totalStudents = fitnessData.length;
+                const completedData = fitnessData.filter(data => 
+                    data.height && data.weight && data.systolic && data.diastolic && data.heartRate
+                ).length;
+                
+                return {
+                    ...session.toObject(),
+                    totalStudents,
+                    completedData,
+                    completionRate: totalStudents > 0 ? Math.round((completedData / totalStudents) * 100) : 0
+                };
+            })
+        );
+
+        res.json({ success: true, examSessions: sessionsWithStats });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+// API để lock/unlock exam session
+const toggleExamSessionLock = async (req, res) => {
+    try {
+        const { examSessionId, isLocked, lockReason } = req.body;
+        
+        if (!examSessionId) {
+            return res.status(400).json({ success: false, message: "Exam session ID is required" });
+        }
+
+        const examSession = await ExamSession.findById(examSessionId);
+        if (!examSession) {
+            return res.status(404).json({ success: false, message: "Exam session not found" });
+        }
+
+        const updateData = {
+            isLocked: isLocked,
+            lockedAt: isLocked ? new Date() : null,
+            lockReason: isLocked ? lockReason : null,
+            lockedBy: req.user?._id || null
+        };
+
+        const updatedSession = await ExamSession.findByIdAndUpdate(
+            examSessionId, 
+            updateData, 
+            { new: true }
+        );
+
+        res.json({ 
+            success: true, 
+            message: `Exam session ${isLocked ? 'locked' : 'unlocked'} successfully`,
+            examSession: updatedSession
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+// API để lấy danh sách edit requests
+const getEditRequests = async (req, res) => {
+    try {
+        const { status, page = 1, limit = 10 } = req.query;
+        
+        let filter = {};
+        if (status && status !== 'all') {
+            filter.status = status;
+        }
+
+        const skip = (page - 1) * limit;
+        
+        const editRequests = await EditRequest.find(filter)
+            .populate('examSessionId', 'examSessionName examSessionDate examSessionAcademicYear')
+            .populate('requestedBy', 'name email')
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(parseInt(limit));
+
+        const total = await EditRequest.countDocuments(filter);
+
+        res.json({ 
+            success: true, 
+            editRequests,
+            pagination: {
+                current: parseInt(page),
+                total: Math.ceil(total / limit),
+                count: editRequests.length,
+                totalRecords: total
+            }
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+// API để approve/reject edit request
+const handleEditRequest = async (req, res) => {
+    try {
+        const { requestId, action, adminResponse, tempUnlockHours } = req.body;
+        
+        if (!requestId || !action) {
+            return res.status(400).json({ 
+                success: false, 
+                message: "Request ID and action are required" 
+            });
+        }
+
+        if (!['approve', 'reject'].includes(action)) {
+            return res.status(400).json({ 
+                success: false, 
+                message: "Action must be 'approve' or 'reject'" 
+            });
+        }
+
+        const editRequest = await EditRequest.findById(requestId)
+            .populate('examSessionId')
+            .populate('requestedBy');
+            
+        if (!editRequest) {
+            return res.status(404).json({ 
+                success: false, 
+                message: "Edit request not found" 
+            });
+        }
+
+        if (editRequest.status !== 'pending') {
+            return res.status(400).json({ 
+                success: false, 
+                message: "Request has already been processed" 
+            });
+        }
+
+        // Update edit request
+        const updateData = {
+            status: action === 'approve' ? 'approved' : 'rejected',
+            reviewedBy: req.user?._id || null,
+            adminResponse: adminResponse || '',
+            reviewedAt: new Date()
+        };
+
+        if (action === 'approve' && tempUnlockHours) {
+            const tempUnlockUntil = new Date();
+            tempUnlockUntil.setHours(tempUnlockUntil.getHours() + parseInt(tempUnlockHours));
+            updateData.tempUnlockUntil = tempUnlockUntil;
+        }
+
+        const updatedRequest = await EditRequest.findByIdAndUpdate(
+            requestId,
+            updateData,
+            { new: true }
+        );
+
+        res.json({ 
+            success: true, 
+            message: `Edit request ${action}d successfully`,
+            editRequest: updatedRequest
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+// API để revoke temporary unlock
+const revokeTempUnlock = async (req, res) => {
+    try {
+        const { requestId } = req.body;
+        
+        if (!requestId) {
+            return res.status(400).json({ 
+                success: false, 
+                message: "Request ID is required" 
+            });
+        }
+
+        const editRequest = await EditRequest.findById(requestId);
+        if (!editRequest) {
+            return res.status(404).json({ 
+                success: false, 
+                message: "Edit request not found" 
+            });
+        }
+
+        const updatedRequest = await EditRequest.findByIdAndUpdate(
+            requestId,
+            { 
+                tempUnlockUntil: null,
+                revokedAt: new Date()
+            },
+            { new: true }
+        );
+
+        res.json({ 
+            success: true, 
+            message: "Temporary unlock revoked successfully",
+            editRequest: updatedRequest
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+const getPhysicalFitnessBySession = async (req, res) => {
+    try {
+        const { examSessionId } = req.query;
+        const physicalFitness = await physicalFitnessModel.find({ examSessionId });
+        res.json({ success: true, data: physicalFitness });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+}
+
+// Get all physical fitness data
+const getAllPhysicalFitness = async (req, res) => {
+    try {
+        const physicalFitness = await physicalFitnessModel.find({});
+        res.json({ success: true, data: physicalFitness });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+}
+
+// Get all abnormality data
+const getAllAbnormality = async (req, res) => {
+    try {
+        const abnormalities = await abnormalityModel.find({});
+        res.json({ success: true, data: abnormalities });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+}
+
+// Get all exam sessions
+const getListExamSession = async (req, res) => {
+    try {
+        const examSessions = await ExamSession.find({}).sort({ createdAt: -1 });
+        res.json({ success: true, data: examSessions });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+}
+
+export { 
+    addDoctor, 
+    loginAdmin, 
+    logoutAdmin, 
+    allDoctors, 
+    appoinmentsAdmin, 
+    appoinmentCancel, 
+    adminDashboard, 
+    deleteDoctor, 
+    addStudent, 
+    listStudents, 
+    importStudentsExcel, 
+    addNews, 
+    getNews, 
+    updateNews, 
+    deleteNews, 
+    createExamSession, 
+    examtionList,
+    deleteStudent,
+    // Lock Management APIs
+    getExamSessionsWithData,
+    toggleExamSessionLock,
+    getEditRequests,
+    handleEditRequest,
+    revokeTempUnlock,
+    getPhysicalFitnessBySession,
+    getAllPhysicalFitness,
+    getAllAbnormality,
+    getListExamSession
+};
