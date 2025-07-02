@@ -7,9 +7,11 @@ export default function Abnormality() {
   const [filtered, setFiltered] = useState([]);
   const [selectedYear, setSelectedYear] = useState("");
   const [selectedClass, setSelectedClass] = useState("");
+  const [selectedMajor, setSelectedMajor] = useState("");
   const [search, setSearch] = useState("");
   const [years, setYears] = useState([]);
   const [classes, setClasses] = useState([]);
+  const [majors, setMajors] = useState([]);
   const [abnormalMap, setAbnormalMap] = useState({});
   const [currentPage, setCurrentPage] = useState(1);
   const rowsPerPage = 10;
@@ -23,6 +25,7 @@ export default function Abnormality() {
         setFiltered(res.data.students);
         setYears([...new Set(res.data.students.map(s => s.year))].filter(Boolean));
         setClasses([...new Set(res.data.students.map(s => s.cohort))].filter(Boolean));
+        setMajors([...new Set(res.data.students.map(s => s.major))].filter(Boolean));
       }
     });
     // Lấy danh sách abnormality
@@ -40,6 +43,7 @@ export default function Abnormality() {
     let data = [...students];
     if (selectedYear) data = data.filter(s => s.year === selectedYear);
     if (selectedClass) data = data.filter(s => s.cohort === selectedClass);
+    if (selectedMajor) data = data.filter(s => s.major === selectedMajor);
     if (search.trim()) {
       const q = search.trim().toLowerCase();
       data = data.filter(
@@ -50,7 +54,7 @@ export default function Abnormality() {
     }
     setFiltered(data);
     setCurrentPage(1); // Reset về trang 1 khi filter
-  }, [selectedYear, selectedClass, search, students]);
+  }, [selectedYear, selectedClass, selectedMajor, search, students]);
 
   // Phân trang
   const indexOfLastRow = currentPage * rowsPerPage;
@@ -99,7 +103,22 @@ export default function Abnormality() {
                   <option key={cls} value={cls}>{cls}</option>
                 ))}
             </select>
-          
+        </div>
+        <div className="flex items-center gap-2">
+          <label className="font-semibold text-base">Major:</label>
+          <select
+            className="border rounded px-3 py-1.5 min-w-[120px]"
+            value={selectedMajor}
+            onChange={(e) => setSelectedMajor(e.target.value)}
+          >
+            <option value="">All</option>
+            {majors
+              .slice()
+              .sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()))
+              .map(major => (
+                <option key={major} value={major}>{major}</option>
+              ))}
+          </select>
         </div>
         <div className="flex items-center gap-2">
           <label className="font-semibold text-base">Search:</label>
@@ -157,7 +176,7 @@ export default function Abnormality() {
 
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={9} className="text-center py-8 text-gray-400">
+                  <td colSpan={10} className="text-center py-8 text-gray-400">
                     No data
                   </td>
                 </tr>

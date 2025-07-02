@@ -3,9 +3,13 @@ import mongoose from "mongoose";
 const PhysicalFitnessSchema = new mongoose.Schema({
   examSessionId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: "ExamSession"
+    ref: "ExamSession",
+    required: true
   },
-  studentId: String,
+  studentId: {
+    type: String,
+    required: true
+  },
   cohort: String,
   gender: String,
   followDate: String,
@@ -24,6 +28,9 @@ const PhysicalFitnessSchema = new mongoose.Schema({
   heartRate: Number,
   danhGiaHeartRate: String,
 });
+
+// Add compound unique index to prevent duplicates
+PhysicalFitnessSchema.index({ studentId: 1, examSessionId: 1 }, { unique: true });
 
 const physicalFitnessModel = mongoose.model.physicalFitness || mongoose.model('physicalFitness', PhysicalFitnessSchema);
 

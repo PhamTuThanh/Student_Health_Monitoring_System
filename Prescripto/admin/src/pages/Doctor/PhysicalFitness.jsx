@@ -6,9 +6,10 @@ import * as XLSX from 'xlsx';
 import { saveAs } from "file-saver";
 import ImportExcelModal from "../../components/ImportExcelModal";
 import EditRequestModal from "./EditRequestModal";
+// Import BMI utilities đã chuẩn hóa
+import { calculateBMI, getBMIClassification, isValidBMI } from "../../utils/bmiUtils";
 
-
-// Utility functions for calculations
+// Utility functions for other health calculations
 const calculateZScoreCC = (height) => {
   const standard = 169.9;
   const sd = 5.7;
@@ -18,11 +19,6 @@ const calculateZScoreCN = (weight) => {
   const standard = 62.3;
   const sd = 10.2;
   return weight ? ((weight - standard) / sd).toFixed(2) : "";
-};
-const calculateBMI = (weight, height) => {
-  if (!weight || !height) return "";
-  const heightInMeters = height / 100;
-  return (weight / (heightInMeters * heightInMeters)).toFixed(2);
 };
 const getDanhGiaCC = (zScore) => {
   if (!zScore) return "";
@@ -40,16 +36,7 @@ const getDanhGiaCN = (zScore) => {
   if (z < 1) return "BT";
   return "NC";
 };
-const getDanhGiaBMI = (bmi) => {
-  if (!bmi) return "";
-  const bmiValue = parseFloat(bmi);
-  if (bmiValue < 18.5) return "G";
-  if (bmiValue < 22.9 && bmiValue > 18.5) return "BT";
-  if (bmiValue < 24.9 && bmiValue > 22.9) return "TC";
-  if (bmiValue < 29.9 && bmiValue > 24.9) return "BP I";
-  if (bmiValue < 30 && bmiValue > 29.9) return "BP II";
-  return "BP III";
-};
+const getDanhGiaBMI = getBMIClassification; // Sử dụng function từ bmiUtils
 const getDanhGiaTTH = (systolic, diastolic) => {
   if (!systolic || !diastolic) return "";
   if (systolic < 120 || diastolic < 80) return "HAT";
@@ -64,6 +51,14 @@ const getDanhGiaHeartRate = (heartRate) => {
   return "NTBT";
 };
 
+// Helper function to normalize examSessionId for comparison
+const normalizeExamSessionId = (id) => {
+  if (!id) return "";
+  if (typeof id === 'object' && id !== null) {
+    return String(id._id || id.$oid || id).trim();
+  }
+  return String(id).trim();
+};
 
 const exportToExcel = (data, filename) => {
   const workbook = XLSX.utils.book_new();
@@ -83,6 +78,8 @@ export default function PhysicalFitness() {
   const [selectedClass, setSelectedClass] = useState("");
   const [searchId, setSearchId] = useState("");
   const [classes, setClasses] = useState([]);
+  const [selectedMajor, setSelectedMajor] = useState("");
+  const [majors, setMajors] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const fileInputRef = useRef();
@@ -110,26 +107,82 @@ export default function PhysicalFitness() {
     return years;
   };
 
+  // Check edit permission when examSessionId changes
+  const checkEditPermission = async (sessionId) => {
+    if (!sessionId) return;
+    
+    try {
+      setIsCheckingPermission(true);
+      const response = await axios.get(`${backendUrl}/api/doctor/check-edit-permission/${sessionId}`, {
+        withCredentials: true
+      });
+      
+      if (response.data.success) {
+        setEditPermission({
+          canEdit: response.data.canEdit,
+          reason: response.data.reason,
+          isLocked: !response.data.canEdit && response.data.reason.includes('locked')
+        });
+      }
+    } catch (error) {
+      console.error('Error checking edit permission:', error);
+      // Default to allowing edit if can't check permission
+      setEditPermission({ canEdit: true, reason: '', isLocked: false });
+    } finally {
+      setIsCheckingPermission(false);
+    }
+  };
+
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
         setError(null);
+        
+        console.log('🔄 fetchData - examSessionId:', examSessionId, 'type:', typeof examSessionId);
+        
+        // Check edit permission and fetch data in parallel
         const [studentsRes, fitnessRes] = await Promise.all([
-          axios.get(`${backendUrl}/api/students`),
-          axios.get(`${backendUrl}/api/doctor/physical-fitness-by-session?examSessionId=${examSessionId}`),
+          axios.get(`${backendUrl}/api/students`, { withCredentials: true }),
+          axios.get(`${backendUrl}/api/doctor/physical-fitness-by-session?examSessionId=${examSessionId}`, { withCredentials: true }),
         ]);
+        
+        console.log('🎓 Students Response:', studentsRes.data.success, 'Count:', studentsRes.data.students?.length);
+        console.log('🏃‍♂️ Fitness Response:', fitnessRes.data.success, 'Count:', fitnessRes.data.data?.length);
+        console.log('🔍 First 2 fitness records:', fitnessRes.data.data?.slice(0, 2));
+        
+        // Check edit permission for this exam session
+        await checkEditPermission(examSessionId);
+        
         if (studentsRes.data.success) {
           const fitnessData = Array.isArray(fitnessRes.data.data) ? fitnessRes.data.data : [];
+          
+          // Debug: Show unique examSessionIds in fitness data
+          const uniqueExamSessionIds = [...new Set(fitnessData.map(f => {
+            let id = f.examSessionId;
+            if (typeof id === 'object' && id !== null) {
+              id = id._id || id.$oid || String(id);
+            }
+            return String(id);
+          }))];
+          console.log('🆔 Unique examSessionIds in fitness data:', uniqueExamSessionIds);
+          console.log('🎯 Looking for examSessionId:', String(examSessionId));
+          
           const newRows = studentsRes.data.students.map((s) => {
             const fit = fitnessData.find(f => {
               let fExamSessionId = f.examSessionId;
               if (typeof fExamSessionId === 'object' && fExamSessionId !== null) {
-                fExamSessionId = fExamSessionId._id || fExamSessionId.$oid || '';
+                fExamSessionId = fExamSessionId._id || fExamSessionId.$oid || String(fExamSessionId);
               }
               const sId = String(s.studentId).replace(/^['"]+|['"]+$/g, '').trim();
               const fId = String(f.studentId).replace(/^['"]+|['"]+$/g, '').trim();
-              return sId === fId && String(fExamSessionId) === String(examSessionId);
+              
+              // Debug log to see what we're comparing
+              if (sId === fId) {
+                console.log('🔍 Matching student:', sId, 'examSessionIds:', String(fExamSessionId), 'vs', String(examSessionId), 'match:', String(fExamSessionId).trim() === String(examSessionId).trim());
+              }
+              
+              return sId === fId && String(fExamSessionId).trim() === String(examSessionId).trim();
             });
             return {
               ...s,
@@ -152,12 +205,17 @@ export default function PhysicalFitness() {
               danhGiaHeartRate: fit?.danhGiaHeartRate || "",
             };
           });
+          
+          console.log('📊 Final rows with fitness data:', newRows.filter(r => r.height).length, 'out of', newRows.length);
           setRows(newRows);
           setFilteredRows(newRows);
           const uniqueClasses = [...new Set(newRows.map(row => row.cohort))].filter(Boolean);
           setClasses(uniqueClasses);
+          const uniqueMajors = [...new Set(newRows.map(row => row.major))].filter(Boolean);
+          setMajors(uniqueMajors);
         }
       } catch (err) {
+        console.error('❌ fetchData error:', err);
         setError(err.message);
       } finally {
         setLoading(false);
@@ -171,7 +229,7 @@ export default function PhysicalFitness() {
   // Reset page to 1 only when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [selectedYear, selectedClass, searchId]);
+  }, [selectedYear, selectedClass, selectedMajor, searchId]);
 
   // Apply filters when rows or filter criteria change
   useEffect(() => {
@@ -182,6 +240,9 @@ export default function PhysicalFitness() {
     if (selectedClass) {
       filtered = filtered.filter(row => row.cohort === selectedClass);
     }
+    if (selectedMajor) {
+      filtered = filtered.filter(row => row.major === selectedMajor);
+    }
     if (searchId.trim()) {
       filtered = filtered.filter(row => {
         const studentId = String(row.studentId || '').toLowerCase();
@@ -190,7 +251,7 @@ export default function PhysicalFitness() {
       });
     }
     setFilteredRows(filtered);
-  }, [rows, selectedYear, selectedClass, searchId]);
+  }, [rows, selectedYear, selectedClass, selectedMajor, searchId]);
 
   const exportColumns = [
     "studentId", "name", "gender", "cohort", "dob", "followDate",
@@ -287,156 +348,36 @@ export default function PhysicalFitness() {
     }
   };
 
-  // const handleImportExcel = async () => {
-  //   const file = fileInputRef.current.files[0];
-  //   if (!file) {
-  //     toast.error('Please select an Excel file!');
-  //     return;
-  //   }
-  //   if (!examSessionId) {
-  //     toast.error('Please select an exam session first!');
-  //     return;
-  //   }
-  //   const formData = new FormData();
-  //   formData.append('file', file);
-  //   formData.append('examSessionId', examSessionId);
-  //   try {
-  //     setLoading(true);
-  //     const response = await axios.post(
-  //       `${backendUrl}/api/doctor/import-physical-fitness-excel`,
-  //       formData,
-  //       {
-  //         headers: {
-  //           'Content-Type': 'multipart/form-data'
-  //         }
-  //       }
-  //     );
-  //     if (response.data.success || response.status === 207) {
-  //       const { summary, updated, errors, warnings } = response.data;
-        
-  //       // Create detailed success message
-  //       let message = `✅ Import completed successfully!\n\n`;
-  //       message += `📊 Summary:\n`;
-  //       message += `• Total rows processed: ${summary.totalRows}\n`;
-  //       message += `• Valid rows: ${summary.validRows}\n`;
-  //       message += `• New records created: ${summary.insertedCount}\n`;
-  //       message += `• Existing records updated: ${summary.updatedCount}\n`;
-        
-  //       if (summary.errorCount > 0) {
-  //         message += `• Errors: ${summary.errorCount}\n`;
-  //       }
-  //       if (summary.warningCount > 0) {
-  //         message += `• Warnings: ${summary.warningCount}\n`;
-  //       }
-
-  //       // Show updated student IDs (limited)
-  //       if (updated && updated.length > 0) {
-  //         message += `\n📝 Updated students: ${updated.join(', ')}`;
-  //         if (response.data.moreUpdated) {
-  //           message += ` (+${response.data.moreUpdated} more)`;
-  //         }
-  //       }
-
-  //       // Show warnings if any
-  //       if (warnings && warnings.details && warnings.details.length > 0) {
-  //         message += `\n\n⚠️ Warnings (${warnings.count}):\n`;
-  //         warnings.details.forEach(w => {
-  //           message += `• Row ${w.row} (${w.studentId}): ${w.warnings.join(', ')}\n`;
-  //         });
-  //         if (warnings.hasMore) {
-  //           message += `... and ${warnings.count - warnings.details.length} more warnings\n`;
-  //         }
-  //       }
-
-  //       // Show errors if any
-  //       if (errors && errors.details && errors.details.length > 0) {
-  //         message += `\n\n❌ Errors (${errors.count}):\n`;
-  //         errors.details.forEach(e => {
-  //           message += `• Row ${e.row} (${e.studentId}): ${e.errors.join(', ')}\n`;
-  //         });
-  //         if (errors.hasMore) {
-  //           message += `... and ${errors.count - errors.details.length} more errors\n`;
-  //         }
-  //       }
-
-  //       // Choose appropriate toast type
-  //       if (summary.errorCount > 0 || summary.warningCount > 0) {
-  //         toast.warn(message, { autoClose: 12000 });
-  //       } else {
-  //         toast.success(message, { autoClose: 8000 });
-  //       }
-
-  //       // Refresh data if any records were processed
-  //       if (summary.insertedCount > 0 || summary.updatedCount > 0) {
-  //         await refreshData();
-  //       }
-        
-  //       // Log detailed info to console for debugging
-  //       console.log('Import Results:', {
-  //         summary,
-  //         updated,
-  //         errors: errors?.details,
-  //         warnings: warnings?.details
-  //       });
-        
-  //     } else {
-  //       toast.error(response.data.message || 'Import failed');
-  //     }
-  //   } catch (err) {
-  //     const errorData = err.response?.data;
-  //     let errorMessage = 'Import error: ';
-      
-  //     if (errorData?.message) {
-  //       errorMessage += errorData.message;
-  //     } else {
-  //       errorMessage += err.message;
-  //     }
-
-  //     // Handle specific error cases
-  //     if (err.response?.status === 413) {
-  //       errorMessage = 'File quá lớn! Vui lòng chọn file nhỏ hơn 10MB.';
-  //     } else if (err.response?.status === 400 && errorData?.invalidRows) {
-  //       errorMessage += `\n\nChi tiết lỗi:`;
-  //       errorData.invalidRows.slice(0, 3).forEach(row => {
-  //         errorMessage += `\nDòng ${row.row}: ${row.errors?.join(', ') || 'Lỗi không xác định'}`;
-  //       });
-        
-  //       if (errorData.totalInvalidRows > 3) {
-  //         errorMessage += `\n... và ${errorData.totalInvalidRows - 3} lỗi khác`;
-  //       }
-  //     }
-
-  //     toast.error(errorMessage, { autoClose: 10000 });
-      
-  //     // Log detailed error info for debugging
-  //     if (errorData) {
-  //       console.error('Import Error Details:', errorData);
-  //     }
-  //   } finally {
-  //     setLoading(false);
-  //     if (fileInputRef.current) {
-  //       fileInputRef.current.value = '';
-  //     }
-  //   }
-  // };
-
   const refreshData = async () => {
     try {
+      console.log('🔄 Refreshing data for examSessionId:', examSessionId);
       const [studentsRes, fitnessRes] = await Promise.all([
-        axios.get(`${backendUrl}/api/students`),
-        axios.get(`${backendUrl}/api/doctor/physical-fitness-by-session?examSessionId=${examSessionId}`),
+        axios.get(`${backendUrl}/api/students`, { withCredentials: true }),
+        axios.get(`${backendUrl}/api/doctor/physical-fitness-by-session?examSessionId=${examSessionId}`, { withCredentials: true }),
       ]);
+      
+      console.log('🎓 Students Response:', studentsRes.data.success, 'Count:', studentsRes.data.students?.length);
+      console.log('🏃‍♂️ Fitness Response:', fitnessRes.data.success, 'Count:', fitnessRes.data.data?.length);
+      
       if (studentsRes.data.success) {
         const fitnessData = Array.isArray(fitnessRes.data.data) ? fitnessRes.data.data : [];
+        console.log('🔍 First fitness record sample:', fitnessData[0]);
+        
         const newRows = studentsRes.data.students.map((s) => {
           const fit = fitnessData.find(f => {
             let fExamSessionId = f.examSessionId;
             if (typeof fExamSessionId === 'object' && fExamSessionId !== null) {
-              fExamSessionId = fExamSessionId._id || fExamSessionId.$oid || '';
+              fExamSessionId = fExamSessionId._id || fExamSessionId.$oid || String(fExamSessionId);
             }
             const sId = String(s.studentId).replace(/^['"]+|['"]+$/g, '').trim();
             const fId = String(f.studentId).replace(/^['"]+|['"]+$/g, '').trim();
-            return sId === fId && String(fExamSessionId) === String(examSessionId);
+            
+            // Debug log to see what we're comparing
+            if (sId === fId) {
+              console.log('🔍 Matching student:', sId, 'examSessionIds:', String(fExamSessionId), 'vs', String(examSessionId));
+            }
+            
+            return sId === fId && String(fExamSessionId).trim() === String(examSessionId).trim();
           });
           return {
             ...s,
@@ -459,12 +400,17 @@ export default function PhysicalFitness() {
             danhGiaHeartRate: fit?.danhGiaHeartRate || "",
           };
         });
+        
+        console.log('📊 Final rows with fitness data:', newRows.filter(r => r.height).length, 'out of', newRows.length);
         setRows(newRows);
         setFilteredRows(newRows);
         const uniqueClasses = [...new Set(newRows.map(row => row.cohort))].filter(Boolean);
         setClasses(uniqueClasses);
+        const uniqueMajors = [...new Set(newRows.map(row => row.major))].filter(Boolean);
+        setMajors(uniqueMajors);
       }
     } catch (error) {
+      console.error('❌ Refresh data error:', error);
       toast.error('Error refreshing data');
     }
   };
@@ -481,7 +427,9 @@ export default function PhysicalFitness() {
   useEffect(() => {
     const fetchExamSessions = async () => {
       try {
-        const res = await axios.get(`${backendUrl}/api/doctor/list-exam-sessions`);
+        const res = await axios.get(`${backendUrl}/api/doctor/list-exam-sessions`, {
+          withCredentials: true
+        });
         if (res.data.success) {
           setExamSessions(res.data.data);
           if (!examSessionId && res.data.data.length > 0 && !autoSelected) {
@@ -583,6 +531,27 @@ export default function PhysicalFitness() {
             </select>
           </div>
           <div className="flex items-center gap-2">
+            <label className="font-semibold text-base">Major:</label>
+            <select
+              className="border rounded px-3 py-1.5 min-w-[120px]"
+              value={selectedMajor}
+              onChange={(e) => setSelectedMajor(e.target.value)}
+            >
+              <option value="">All</option>
+              {majors
+                .slice()
+                .sort((a, b) => {
+                  const numA = parseInt(a.match(/\d+/)?.[0] || '0', 10);
+                  const numB = parseInt(b.match(/\d+/)?.[0] || '0', 10);
+                  if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+                  return a.toLowerCase().localeCompare(b.toLowerCase(), undefined, { numeric: true });
+                })
+                .map(major => (
+                  <option key={major} value={major}>{major}</option>
+                ))}
+            </select>
+          </div>
+          <div className="flex items-center gap-2">
             <label className="font-semibold text-base">Search:</label>
             <input
               type="text"
@@ -615,13 +584,35 @@ export default function PhysicalFitness() {
             >
               Export Excel
             </button>
-            <button
-              onClick={() => setShowEditRequestModal(true)}
-              className="bg-red-500 hover:bg-red-600 text-white px-4 py-1.5 rounded"
-              disabled={!examSessionId}
-            > 
-              Edit Request
-            </button>
+            
+            {/* Only show Edit Request button when exam session is locked */}
+            {editPermission.isLocked && (
+              <button
+                onClick={() => setShowEditRequestModal(true)}
+                className="bg-red-500 hover:bg-red-600 text-white px-4 py-1.5 rounded flex items-center gap-2"
+                disabled={!examSessionId || isCheckingPermission}
+              > 
+                {isCheckingPermission ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    Checking...
+                  </>
+                ) : (
+                  <>
+                    🔒 Edit Request
+                  </>
+                )}
+              </button>
+            )}
+            
+            {/* Show lock status indicator */}
+            {editPermission.isLocked && (
+              <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-3 py-1.5 rounded text-sm">
+                <span className="flex items-center gap-1">
+                  🔒 Session Locked
+                </span>
+              </div>
+            )}
           </div>
         </div>
         <div className="bg-[#f6f7fa] p-6 rounded-xl overflow-hidden mx-auto max-w-[1400px]">
@@ -629,11 +620,11 @@ export default function PhysicalFitness() {
             <table className="min-w-[1700px] w-full border-separate border-spacing-0 bg-white rounded-lg border border-[#eee]">
               <thead>
                 <tr className="sticky top-0 z-20 bg-white shadow">
-                  <th className="min-w-[80px] text-center align-middle py-2 sticky left-0 z-10 bg-white border-r border-[#eee]">STT</th>
-                  <th className="min-w-[120px] text-center align-middle py-2 sticky left-0 z-10 bg-white border-r border-[#eee]">Student ID</th>
-                  <th className="min-w-[120px] text-center align-middle py-2 sticky left-[120px] z-10 bg-white border-r border-[#eee]">Name</th>
-                  <th className="min-w-[80px] text-center align-middle py-2 sticky left-[240px] z-10 bg-white border-r border-[#eee]">Gender</th>
-                  <th className="min-w-[100px] text-center align-middle py-2 sticky left-[320px] z-10 bg-white border-r border-[#eee]">Class</th>
+                  <th className="min-w-[80px] text-center align-middle py-2 sticky left-0 z-30 bg-white border-r border-[#eee]">STT</th>
+                  <th className="min-w-[120px] text-center align-middle py-2 sticky left-[80px] z-30 bg-white border-r border-[#eee]">Student ID</th>
+                  <th className="min-w-[120px] text-center align-middle py-2 sticky left-[200px] z-30 bg-white border-r border-[#eee]">Name</th>
+                  <th className="min-w-[80px] text-center align-middle py-2 sticky left-[320px] z-30 bg-white border-r border-[#eee]">Gender</th>
+                  <th className="min-w-[100px] text-center align-middle py-2 sticky left-[400px] z-30 bg-white border-r border-[#eee]">Class</th>
                   <th className="min-w-[120px] text-center align-middle py-2 border-r border-[#eee]">Date of birth</th>
                   <th className="min-w-[120px] text-center align-middle py-2 border-r border-[#eee]">Follow Date</th>
                   <th className="min-w-[120px] text-center align-middle py-2 border-r border-[#eee]">Height (cm)</th>
@@ -656,11 +647,11 @@ export default function PhysicalFitness() {
               <tbody>
                 {currentRows.map((row, idx) => (
                   <tr key={row._id || idx} className="even:bg-[#f6f7fa]">
-                    <td className="text-center align-middle py-2 sticky left-0 z-10 bg-white border-r border-[#eee]">{indexOfFirstRow + idx + 1}</td>
-                    <td className="text-center align-middle py-2 sticky left-0 z-10 bg-white border-r border-[#eee]">{row.studentId}</td>
-                    <td className="text-center align-middle py-2 sticky left-[120px] z-10 bg-white border-r border-[#eee]">{row.name}</td>
-                    <td className="text-center align-middle py-2 sticky left-[240px] z-10 bg-white border-r border-[#eee]">{row.gender}</td>
-                    <td className="text-center align-middle py-2 sticky left-[320px] z-10 bg-white border-r border-[#eee]">{row.cohort}</td>
+                    <td className="text-center align-middle py-2 sticky left-0 z-20 bg-white border-r border-[#eee]">{indexOfFirstRow + idx + 1}</td>
+                    <td className="text-center align-middle py-2 sticky left-[80px] z-20 bg-white border-r border-[#eee]">{row.studentId}</td>
+                    <td className="text-center align-middle py-2 sticky left-[200px] z-20 bg-white border-r border-[#eee]">{row.name}</td>
+                    <td className="text-center align-middle py-2 sticky left-[320px] z-20 bg-white border-r border-[#eee]">{row.gender}</td>
+                    <td className="text-center align-middle py-2 sticky left-[400px] z-20 bg-white border-r border-[#eee]">{row.cohort}</td>
                     <td className="text-center align-middle py-2 border-r border-[#eee]">{row.dob}</td>
                     <td className="text-center align-middle py-2 border-r border-[#eee]">
                       <input
@@ -668,6 +659,7 @@ export default function PhysicalFitness() {
                         className="w-[120px] border rounded px-2 py-1"
                         value={row.followDate}
                         onChange={(e) => handleChange(row._id, "followDate", e.target.value)}
+                        disabled={editPermission.isLocked}
                       />
                     </td>
                     <td className="text-center align-middle py-2 border-r border-[#eee]">
@@ -679,6 +671,7 @@ export default function PhysicalFitness() {
                           const value = e.target.value;
                           handleChange(row._id, "height", Number(value) < 0 ? 0 : value);
                         }}
+                        disabled={editPermission.isLocked}
                       />
                     </td>
                     <td className="text-center align-middle py-2 border-r border-[#eee]">{row.zScoreCC}</td>
@@ -692,6 +685,7 @@ export default function PhysicalFitness() {
                           const value = e.target.value;
                           handleChange(row._id, "weight", Number(value) < 0 ? 0 : value);
                         }}
+                        disabled={editPermission.isLocked}
                       />
                     </td>
                     <td className="text-center align-middle py-2 border-r border-[#eee]">{row.zScoreCN}</td>
@@ -708,6 +702,7 @@ export default function PhysicalFitness() {
                           const value = e.target.value;
                           handleChange(row._id, "systolic", Number(value) < 0 ? 0 : value);
                         }}
+                        disabled={editPermission.isLocked}
                       />
                     </td>
                     <td className="text-center align-middle py-2 border-r border-[#eee]">
@@ -719,6 +714,7 @@ export default function PhysicalFitness() {
                           const value = e.target.value;
                           handleChange(row._id, "diastolic", Number(value) < 0 ? 0 : value);
                         }}
+                        disabled={editPermission.isLocked}
                       />
                     </td>
                     <td className="text-center align-middle py-2 border-r border-[#eee]">{row.danhGiaTTH}</td>
@@ -731,13 +727,20 @@ export default function PhysicalFitness() {
                           const value = e.target.value;
                           handleChange(row._id, "heartRate", Number(value) < 0 ? 0 : value);
                         }}
+                        disabled={editPermission.isLocked}
                       />
                     </td>
                     <td className="text-center align-middle py-2 border-r border-[#eee]">{row.danhGiaHeartRate}</td>
                     <td className="text-center align-middle py-2">
                       <button
-                        className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded"
+                        className={`px-3 py-1 rounded text-white ${
+                          editPermission.isLocked 
+                            ? 'bg-gray-400 cursor-not-allowed' 
+                            : 'bg-blue-500 hover:bg-blue-600'
+                        }`}
                         onClick={() => handleSave(row._id)}
+                        disabled={editPermission.isLocked}
+                        title={editPermission.isLocked ? 'Session is locked. Request edit access to make changes.' : 'Save changes'}
                       >
                         Save
                       </button>

@@ -183,12 +183,40 @@ const getInfoUser = async () => {
     });
     return response.data;
 };
-const getPhysicalData = async (studentId) => {
+const getPhysicalData = async (studentId, examSessionId) => {
     const token = await AsyncStorage.getItem("token");
     if (!token) {
         throw new Error("No authentication token found");
     }
-    const response = await axios.get(`${BACKEND_URL}/api/user/data-physical/${studentId}`, {
+    let url = `${BACKEND_URL}/api/user/data-physical/${studentId}`;
+    if (examSessionId) {
+        url += `?examSessionId=${examSessionId}`;
+    }
+    const response = await axios.get(url, {
+        headers: { "Authorization": `Bearer ${token}` }
+    });
+    return response.data;
+};
+
+// New API to get exam sessions for a student
+const getExamSessions = async (studentId) => {
+    const token = await AsyncStorage.getItem("token");
+    if (!token) {
+        throw new Error("No authentication token found");
+    }
+    const response = await axios.get(`${BACKEND_URL}/api/user/get-exam-sessions/${studentId}`, {
+        headers: { "Authorization": `Bearer ${token}` }
+    });
+    return response.data;
+};
+
+// New API to compare health data between exam sessions
+const compareHealthData = async (studentId, examSessionId1, examSessionId2) => {
+    const token = await AsyncStorage.getItem("token");
+    if (!token) {
+        throw new Error("No authentication token found");
+    }
+    const response = await axios.get(`${BACKEND_URL}/api/user/compare-health-data/${studentId}?examSessionId1=${examSessionId1}&examSessionId2=${examSessionId2}`, {
         headers: { "Authorization": `Bearer ${token}` }
     });
     return response.data;
@@ -243,4 +271,4 @@ axios.interceptors.response.use(
         return Promise.reject(error);
     }
 );
-export {loginUser, registerUser, getChatbot, getDataPhysical, messageSidebar, getMessage, sendMessage, saveChatHistory, getChatHistory, getAnnouncements, getInfoUser, getPhysicalData, forgotPassword, changePassword, getAbnormality, getPrescription, getHealthScores};
+export {loginUser, registerUser, getChatbot, getDataPhysical, messageSidebar, getMessage, sendMessage, saveChatHistory, getChatHistory, getAnnouncements, getInfoUser, getPhysicalData, getExamSessions, compareHealthData, forgotPassword, changePassword, getAbnormality, getPrescription, getHealthScores};

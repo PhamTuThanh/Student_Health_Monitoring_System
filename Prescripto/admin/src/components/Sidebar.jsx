@@ -154,6 +154,7 @@ const Sidebar = () => {
                 <StyledNavLink to="/exam-session-manager" icon={assets.calendar_icon} label="Lock Management" />
               </DropdownMenu>
               <StyledNavLink to="/health-data-manager" icon={assets.data_analysis_icon} label="Health Data Management" />
+              <StyledNavLink to="/backup-management" icon={assets.view_detail_icon} label="Backup Management" />
             </ul>
           </div>
         )}

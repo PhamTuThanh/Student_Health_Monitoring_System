@@ -7,6 +7,7 @@ import { v2 as cloudinary } from 'cloudinary'
 import doctorModel from './../models/doctorModel.js';
 import appoinmentModel from '../models/appoinmentModel.js';
 import physicalFitnessModel from '../models/physicalFitnessModel.js';
+import examSessionModel from '../models/examSessionModel.js';
 import paypal from 'paypal-rest-sdk';
 import { sendAppointmentNotification, sendForgotPasswordEmail } from '../utils/emailService.js';
 import chatBotModel from '../models/chatBotModel.js';
@@ -510,16 +511,22 @@ const getDoctorsForChat = async (req, res) => {
 //lấy dữ liệu từ bảng physical của mỗi user
 const getPhysicalData = async (req, res) => {
     try {
-      const {studentId } = req.params; // hoặc req.query nếu muốn
+      const { studentId } = req.params;
+      const { examSessionId } = req.query; // Add examSessionId as query parameter
   
       let query = {};
       if (studentId) {
         query.studentId = studentId;
       } else {
-        return res.status(400).json({ success: false, message: "Missing userId or studentId" });
+        return res.status(400).json({ success: false, message: "Missing studentId" });
+      }
+
+      // Add examSessionId filter if provided
+      if (examSessionId) {
+        query.examSessionId = examSessionId;
       }
   
-      const physicalData = await physicalFitnessModel.find(query);
+      const physicalData = await physicalFitnessModel.find(query).populate('examSessionId', 'examSessionName examSessionAcademicYear examSessionDate');
       if (!physicalData || physicalData.length === 0) {
         return res.status(404).json({ success: false, message: "No physical data found" });
       }
@@ -529,7 +536,106 @@ const getPhysicalData = async (req, res) => {
       console.error("Error in getPhysicalData:", error.message);
       res.status(500).json({ success: false, message: "Internal server error" });
     }
-  };
+};
+
+// New API to get exam sessions for a student
+const getExamSessions = async (req, res) => {
+  try {
+    const { studentId } = req.params;
+    
+    // Find all exam sessions where this student has data
+    const physicalData = await physicalFitnessModel.find({ studentId }).populate('examSessionId', 'examSessionName examSessionAcademicYear examSessionDate').sort({ 'examSessionId.examSessionDate': -1 });
+    
+    if (!physicalData || physicalData.length === 0) {
+      return res.json({ success: true, data: [] });
+    }
+
+    // Extract unique exam sessions
+    const examSessions = physicalData.reduce((unique, item) => {
+      if (item.examSessionId && !unique.find(session => session._id.toString() === item.examSessionId._id.toString())) {
+        unique.push({
+          _id: item.examSessionId._id,
+          examSessionName: item.examSessionId.examSessionName,
+          examSessionAcademicYear: item.examSessionId.examSessionAcademicYear,
+          examSessionDate: item.examSessionId.examSessionDate
+        });
+      }
+      return unique;
+    }, []);
+
+    res.json({ success: true, data: examSessions });
+  } catch (error) {
+    console.error("Error in getExamSessions:", error.message);
+    res.status(500).json({ success: false, message: "Internal server error" });
+  }
+};
+
+// New API to compare health data between exam sessions
+const compareHealthData = async (req, res) => {
+  try {
+    const { studentId } = req.params;
+    const { examSessionId1, examSessionId2 } = req.query;
+    
+    if (!examSessionId1 || !examSessionId2) {
+      return res.status(400).json({ success: false, message: "Missing examSessionIds for comparison" });
+    }
+
+    const [data1, data2] = await Promise.all([
+      physicalFitnessModel.findOne({ studentId, examSessionId: examSessionId1 }).populate('examSessionId'),
+      physicalFitnessModel.findOne({ studentId, examSessionId: examSessionId2 }).populate('examSessionId')
+    ]);
+
+    if (!data1 || !data2) {
+      return res.status(404).json({ success: false, message: "Data not found for one or both exam sessions" });
+    }
+
+    // Calculate differences
+    const comparison = {
+      session1: {
+        _id: data1.examSessionId._id,
+        name: data1.examSessionId.examSessionName,
+        academicYear: data1.examSessionId.examSessionAcademicYear,
+        date: data1.examSessionId.examSessionDate,
+        height: data1.height,
+        weight: data1.weight,
+        bmi: data1.bmi,
+        systolic: data1.systolic,
+        diastolic: data1.diastolic,
+        heartRate: data1.heartRate,
+        danhGiaBMI: data1.danhGiaBMI,
+        danhGiaTTH: data1.danhGiaTTH
+      },
+      session2: {
+        _id: data2.examSessionId._id,
+        name: data2.examSessionId.examSessionName,
+        academicYear: data2.examSessionId.examSessionAcademicYear,
+        date: data2.examSessionId.examSessionDate,
+        height: data2.height,
+        weight: data2.weight,
+        bmi: data2.bmi,
+        systolic: data2.systolic,
+        diastolic: data2.diastolic,
+        heartRate: data2.heartRate,
+        danhGiaBMI: data2.danhGiaBMI,
+        danhGiaTTH: data2.danhGiaTTH
+      },
+      differences: {
+        height: data2.height - data1.height,
+        weight: data2.weight - data1.weight,
+        bmi: (parseFloat(data2.bmi) - parseFloat(data1.bmi)).toFixed(2),
+        systolic: data2.systolic - data1.systolic,
+        diastolic: data2.diastolic - data1.diastolic,
+        heartRate: data2.heartRate - data1.heartRate
+      }
+    };
+
+    res.json({ success: true, data: comparison });
+  } catch (error) {
+    console.error("Error in compareHealthData:", error.message);
+    res.status(500).json({ success: false, message: "Internal server error" });
+  }
+};
+
 const saveChatHistory = async (req, res) => {
     try {
         console.log("Headers:", req.headers); // Debug log
@@ -719,4 +825,4 @@ const getPrescriptionByStudentId = async (req, res) => {
     }
 };
 
-export { registerUser, loginUser, getProfile, updateProfile, bookAppoinment, listAppoinment, cancelAppoinment, createPayPalPayment,handlePayPalSuccess,handlePayPalCancel, sendEmail, getUsersForChat, getDoctorsForChat, getPhysicalData, saveChatHistory, getChatHistory, getAnnouncements, forgotPassword, changePassword, getHealthScores, getAbnormalityByStudentId, getPrescriptionByStudentId };
+export { registerUser, loginUser, getProfile, updateProfile, bookAppoinment, listAppoinment, cancelAppoinment, createPayPalPayment,handlePayPalSuccess,handlePayPalCancel, sendEmail, getUsersForChat, getDoctorsForChat, getPhysicalData, saveChatHistory, getChatHistory, getAnnouncements, forgotPassword, changePassword, getHealthScores, getAbnormalityByStudentId, getPrescriptionByStudentId, getExamSessions, compareHealthData };

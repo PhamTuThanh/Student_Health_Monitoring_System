@@ -8,6 +8,9 @@ import HealthAnalytics from "../../components/HealthAnalytics";
 import AbnormalityMonitoring from "../../components/AbnormalityMonitoring";
 import ReportsAndSettings from "../../components/ReportsAndSettings";
 import { useAppContext } from "../../context/AppContext";
+// Import BMI utilities đã chuẩn hóa
+import { isHealthyBMI, isValidBMI } from "../../utils/bmiUtils";
+import { processAnalyticsData, calculateHealthStatus, filterValidHealthData, calculateHealthyStudentsRate } from "../../utils/healthDataUtils";
 
 const HealthDataManager = () => {
   const { aToken } = useContext(AdminContext);
@@ -43,7 +46,8 @@ const HealthDataManager = () => {
     bmiDistribution: [],
     healthTrends: [],
     abnormalityBreakdown: [],
-    cohortComparison: []
+    cohortComparison: [],
+    academicYearComparison: []
   });
   
   // Abnormalities states
@@ -74,21 +78,39 @@ const HealthDataManager = () => {
       const targetExamSessionId = selectedExamSessionId || filters.examSessionId;
       
       let physicalFitnessUrl = `${backendUrl}/api/admin/all-physical-fitness`;
+      let abnormalityUrl = `${backendUrl}/api/admin/all-abnormality`;
+      
       if (targetExamSessionId) {
         physicalFitnessUrl = `${backendUrl}/api/admin/physical-fitness-by-session?examSessionId=${targetExamSessionId}`;
+        // Filter abnormalities by the same exam session's time period
+        abnormalityUrl = `${backendUrl}/api/admin/all-abnormality`; // We'll filter this after getting exam session dates
       }
       
       const [studentsRes, physicalFitnessRes, abnormalityRes, examSessionsRes] = await Promise.all([
         axios.get(`${backendUrl}/api/students`),
         axios.get(physicalFitnessUrl),
-        axios.get(`${backendUrl}/api/admin/all-abnormality`),
+        axios.get(abnormalityUrl),
         axios.get(`${backendUrl}/api/admin/list-exam-session`)
       ]);
 
       const allStudentsData = studentsRes.data.students || [];
       const physicalFitnessData = physicalFitnessRes.data.data || [];
-      const abnormalityData = abnormalityRes.data.data || [];
+      let abnormalityData = abnormalityRes.data.data || [];
       const examSessionsData = examSessionsRes.data.data || [];
+
+      // Filter abnormality data by exam session period if targetExamSessionId is set
+      if (targetExamSessionId) {
+        const selectedSession = examSessionsData.find(session => session._id === targetExamSessionId);
+        if (selectedSession && selectedSession.startDate && selectedSession.endDate) {
+          const sessionStartDate = new Date(selectedSession.startDate);
+          const sessionEndDate = new Date(selectedSession.endDate);
+          
+          abnormalityData = abnormalityData.filter(item => {
+            const itemDate = new Date(item.date);
+            return itemDate >= sessionStartDate && itemDate <= sessionEndDate;
+          });
+        }
+      }
 
       // Calculate KPIs based on exam session
       let totalStudents = allStudentsData.length;
@@ -100,25 +122,23 @@ const HealthDataManager = () => {
       }
       
       // Only count students with valid health data
-      const studentsWithValidData = physicalFitnessData.filter(item => {
-        const bmi = parseFloat(item.bmi);
-        return item.studentId && !isNaN(bmi) && bmi > 0 && bmi < 100;
-      });
+      const studentsWithValidData = filterValidHealthData(physicalFitnessData);
       
       const totalStudentsWithData = new Set(studentsWithValidData.map(item => item.studentId)).size;
       
-      const currentMonth = new Date().getMonth();
-      const currentYear = new Date().getFullYear();
-      const abnormalitiesThisMonth = abnormalityData.filter(item => {
-        const itemDate = new Date(item.date);
-        return itemDate.getMonth() === currentMonth && itemDate.getFullYear() === currentYear;
-      }).length;
+      // Calculate abnormalities for the filtered period
+      let abnormalitiesThisMonth = abnormalityData.length;
+      if (!targetExamSessionId) {
+        // If no specific session, use current month logic
+        const currentMonth = new Date().getMonth();
+        const currentYear = new Date().getFullYear();
+        abnormalitiesThisMonth = abnormalityData.filter(item => {
+          const itemDate = new Date(item.date);
+          return itemDate.getMonth() === currentMonth && itemDate.getFullYear() === currentYear;
+        }).length;
+      }
 
-      const healthyStudents = studentsWithValidData.filter(item => {
-        const bmi = parseFloat(item.bmi);
-        return bmi >= 18.5 && bmi <= 24.9;
-      });
-      const healthyStudentsRate = totalStudentsWithData > 0 ? Math.round((healthyStudents.length / totalStudentsWithData) * 100) : 0;
+      const healthyStudentsRate = calculateHealthyStudentsRate(physicalFitnessData);
 
       setKpiData({
         totalStudents,
@@ -129,8 +149,8 @@ const HealthDataManager = () => {
       });
 
       // Process analytics data
-      const bmiDistribution = processAnalyticsData(physicalFitnessData, abnormalityData);
-      setAnalyticsData(bmiDistribution);
+      const analyticsResult = processAnalyticsData(physicalFitnessData, abnormalityData, examSessionsData);
+      setAnalyticsData(analyticsResult);
       setAbnormalitiesData(abnormalityData);
 
     } catch (error) {
@@ -139,110 +159,6 @@ const HealthDataManager = () => {
     } finally {
       setLoading(false);
     }
-  };
-
-  // Process analytics data function
-  const processAnalyticsData = (physicalData, abnormalityData) => {
-    // BMI Distribution
-    const bmiRanges = { 'Underweight': 0, 'Normal': 0, 'Overweight': 0, 'Obese': 0 };
-    
-    // Only process if we have physical data
-    if (physicalData && physicalData.length > 0) {
-      physicalData.forEach(item => {
-        // Validate BMI data before processing
-        const bmi = parseFloat(item.bmi);
-        
-        // Only count valid BMI values (not NaN, not null, not undefined, and reasonable range)
-        if (!isNaN(bmi) && bmi > 0 && bmi < 100) {
-          if (bmi < 18.5) bmiRanges['Underweight']++;
-          else if (bmi <= 24.9) bmiRanges['Normal']++;
-          else if (bmi <= 29.9) bmiRanges['Overweight']++;
-          else bmiRanges['Obese']++;
-        }
-      });
-    }
-
-    // Health trends (last 6 months)
-    const healthTrends = [];
-    for (let i = 5; i >= 0; i--) {
-      const date = new Date();
-      date.setMonth(date.getMonth() - i);
-      const monthData = physicalData.filter(item => {
-        const itemDate = new Date(item.followDate);
-        return itemDate.getMonth() === date.getMonth() && itemDate.getFullYear() === date.getFullYear();
-      });
-      
-      // Only count records with valid BMI data
-      const validMonthData = monthData.filter(item => {
-        const bmi = parseFloat(item.bmi);
-        return !isNaN(bmi) && bmi > 0 && bmi < 100;
-      });
-      
-      const healthyCount = validMonthData.filter(item => {
-        const bmi = parseFloat(item.bmi);
-        return bmi >= 18.5 && bmi <= 24.9;
-      }).length;
-      
-      healthTrends.push({
-        month: date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
-        healthy: healthyCount,
-        total: validMonthData.length,
-        healthyRate: validMonthData.length > 0 ? Math.round((healthyCount / validMonthData.length) * 100) : 0
-      });
-    }
-
-    // Abnormality breakdown
-    const symptomCounts = {};
-    if (abnormalityData && abnormalityData.length > 0) {
-      abnormalityData.forEach(item => {
-        // Only process if symptoms array exists and is not empty
-        if (item.symptoms && Array.isArray(item.symptoms) && item.symptoms.length > 0) {
-          item.symptoms.forEach(symptom => {
-            if (symptom && symptom.trim()) { // Only count non-empty symptoms
-              symptomCounts[symptom] = (symptomCounts[symptom] || 0) + 1;
-            }
-          });
-        }
-      });
-    }
-    
-    const abnormalityBreakdown = Object.entries(symptomCounts)
-      .sort(([,a], [,b]) => b - a)
-      .slice(0, 5)
-      .map(([symptom, count]) => ({ symptom, count }));
-
-    // Cohort comparison
-    const cohortData = {};
-    if (physicalData && physicalData.length > 0) {
-      physicalData.forEach(item => {
-        const bmi = parseFloat(item.bmi);
-        
-        // Only process records with valid BMI and cohort data
-        if (item.cohort && !isNaN(bmi) && bmi > 0 && bmi < 100) {
-          if (!cohortData[item.cohort]) {
-            cohortData[item.cohort] = { total: 0, healthy: 0 };
-          }
-          cohortData[item.cohort].total++;
-          
-          if (bmi >= 18.5 && bmi <= 24.9) {
-            cohortData[item.cohort].healthy++;
-          }
-        }
-      });
-    }
-    
-    const cohortComparison = Object.entries(cohortData).map(([cohort, data]) => ({
-      cohort,
-      healthyRate: data.total > 0 ? Math.round((data.healthy / data.total) * 100) : 0,
-      totalStudents: data.total
-    }));
-
-    return {
-      bmiDistribution: Object.entries(bmiRanges).map(([category, count]) => ({ category, count })),
-      healthTrends,
-      abnormalityBreakdown,
-      cohortComparison
-    };
   };
 
   // Get students health summary
@@ -254,19 +170,37 @@ const HealthDataManager = () => {
       const targetExamSessionId = selectedExamSessionId || filters.examSessionId;
       
       let physicalFitnessUrl = `${backendUrl}/api/admin/all-physical-fitness`;
+      let abnormalityUrl = `${backendUrl}/api/admin/all-abnormality`;
+      
       if (targetExamSessionId) {
         physicalFitnessUrl = `${backendUrl}/api/admin/physical-fitness-by-session?examSessionId=${targetExamSessionId}`;
       }
       
-      const [studentsRes, physicalFitnessRes, abnormalityRes] = await Promise.all([
+      const [studentsRes, physicalFitnessRes, abnormalityRes, examSessionsRes] = await Promise.all([
         axios.get(`${backendUrl}/api/students`),
         axios.get(physicalFitnessUrl),
-        axios.get(`${backendUrl}/api/admin/all-abnormality`)
+        axios.get(abnormalityUrl),
+        axios.get(`${backendUrl}/api/admin/list-exam-session`)
       ]);
 
       const students = studentsRes.data.students || [];
       const physicalFitnessData = physicalFitnessRes.data.data || [];
-      const abnormalityData = abnormalityRes.data.data || [];
+      let abnormalityData = abnormalityRes.data.data || [];
+      const examSessionsData = examSessionsRes.data.data || [];
+
+      // Filter abnormality data by exam session period if targetExamSessionId is set
+      if (targetExamSessionId) {
+        const selectedSession = examSessionsData.find(session => session._id === targetExamSessionId);
+        if (selectedSession && selectedSession.startDate && selectedSession.endDate) {
+          const sessionStartDate = new Date(selectedSession.startDate);
+          const sessionEndDate = new Date(selectedSession.endDate);
+          
+          abnormalityData = abnormalityData.filter(item => {
+            const itemDate = new Date(item.date);
+            return itemDate >= sessionStartDate && itemDate <= sessionEndDate;
+          });
+        }
+      }
 
       // Combine data
       const combinedData = students.map(student => {
@@ -287,18 +221,8 @@ const HealthDataManager = () => {
 
         const abnormalityCount = abnormalityData.filter(item => item.studentId === student.studentId).length;
 
-        let healthStatus = 'Normal';
-        if (latestFitness) {
-          const bmi = parseFloat(latestFitness.bmi);
-          const systolic = parseFloat(latestFitness.systolic);
-          const diastolic = parseFloat(latestFitness.diastolic);
-          
-          if (bmi < 18.5 || bmi > 30 || systolic > 140 || diastolic > 90 || abnormalityCount > 0) {
-            healthStatus = 'Alert';
-          } else if (bmi < 20 || bmi > 25 || systolic > 120 || diastolic > 80) {
-            healthStatus = 'Warning';
-          }
-        }
+        // SỬ DỤNG calculateHealthStatus từ utils
+        const healthStatus = calculateHealthStatus(latestFitness, abnormalityCount);
 
         return {
           ...student,
@@ -656,14 +580,26 @@ const HealthDataManager = () => {
     }
   }, [aToken]);
 
+  // Auto-select latest exam session when sessions are loaded
+  useEffect(() => {
+    if (examSessions.length > 0 && !filters.examSessionId) {
+      const latestSession = examSessions[0]; // Already sorted by newest first
+      setFilters(prev => ({
+        ...prev,
+        academicYear: latestSession.examSessionAcademicYear || latestSession.academicYear,
+        examSessionId: latestSession._id
+      }));
+      fetchKPIData(latestSession._id);
+      fetchStudentsHealthData(latestSession._id);
+    }
+  }, [examSessions]);
+
   // Update KPI when filters change
   useEffect(() => {
     if (aToken && filters.examSessionId) {
       fetchKPIData(filters.examSessionId);
     }
   }, [filters.examSessionId, aToken]);
-
-
 
   return (
     <div className="p-6 bg-gray-50 min-h-screen h-[calc(100vh-80px)] overflow-y-auto ml-10 w-[950px] mb-10">
@@ -676,7 +612,7 @@ const HealthDataManager = () => {
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <KPICard
-          title={filters.examSessionId ? "Students Examined / In Session" : "Students Examined / Total"}
+          title="Students Examined / In Session"
           value={`${kpiData.totalStudentsWithData}/${kpiData.totalStudents}`}
           icon="👥"
           color="#3B82F6"
@@ -742,7 +678,7 @@ const HealthDataManager = () => {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
                 <div>
                   <p className="text-2xl font-bold text-blue-600">{kpiData.totalStudents}</p>
-                  <p className="text-sm text-gray-600">{filters.examSessionId ? "Students in Session" : "Total Students"}</p>
+                  <p className="text-sm text-gray-600">Students in Session</p>
                 </div>
                 <div>
                   <p className="text-2xl font-bold text-green-600">{kpiData.totalStudentsWithData}</p>
@@ -838,14 +774,10 @@ const HealthDataManager = () => {
                   if (selectedSession) {
                     fetchKPIData(selectedSession._id);
                     fetchStudentsHealthData(selectedSession._id);
-                  } else {
-                    fetchKPIData(null); // Load all data when no session selected
-                    fetchStudentsHealthData(null);
                   }
                 }}
                 className="border border-gray-300 rounded-lg px-3 py-2"
               >
-                <option value="">All Academic Years</option>
                 {examSessions.map(session => (
                   <option key={session._id} value={session.examSessionAcademicYear || session.academicYear}>
                     {session.examSessionAcademicYear || session.academicYear}
@@ -884,7 +816,20 @@ const HealthDataManager = () => {
               />
 
               <button
-                onClick={() => setFilters({academicYear: '', cohort: '', healthStatus: '', searchTerm: ''})}
+                onClick={() => {
+                  const latestSession = examSessions[0]; // Get latest session
+                  setFilters({
+                    academicYear: latestSession ? (latestSession.examSessionAcademicYear || latestSession.academicYear) : '',
+                    examSessionId: latestSession ? latestSession._id : '',
+                    cohort: '', 
+                    healthStatus: '', 
+                    searchTerm: ''
+                  });
+                  if (latestSession) {
+                    fetchKPIData(latestSession._id);
+                    fetchStudentsHealthData(latestSession._id);
+                  }
+                }}
                 className="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600"
               >
                 Clear Filters
@@ -930,7 +875,16 @@ const HealthDataManager = () => {
                         </span>
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {student.lastCheckDate !== 'No data' ? new Date(student.lastCheckDate).toLocaleDateString() : 'No data'}
+                        {student.lastCheckDate && student.lastCheckDate !== 'No data' ? 
+                          (() => {
+                            try {
+                              const date = new Date(student.lastCheckDate);
+                              return isNaN(date.getTime()) ? 'Invalid date' : date.toLocaleDateString('vi-VN');
+                            } catch {
+                              return 'Invalid date';
+                            }
+                          })() : 'No data'
+                        }
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap text-sm font-medium">
                         <button 
@@ -1043,7 +997,18 @@ const HealthDataManager = () => {
                     <p><strong>BMI:</strong> {selectedStudent.latestFitness.bmi}</p>
                     <p><strong>Blood Pressure:</strong> {selectedStudent.latestFitness.systolic}/{selectedStudent.latestFitness.diastolic}</p>
                     <p><strong>Heart Rate:</strong> {selectedStudent.latestFitness.heartRate}</p>
-                    <p><strong>Last Check:</strong> {new Date(selectedStudent.lastCheckDate).toLocaleDateString()}</p>
+                    <p><strong>Last Check:</strong> 
+                      {selectedStudent.lastCheckDate && selectedStudent.lastCheckDate !== 'No data' ? 
+                        (() => {
+                          try {
+                            const date = new Date(selectedStudent.lastCheckDate);
+                            return isNaN(date.getTime()) ? 'Invalid date' : date.toLocaleDateString('vi-VN');
+                          } catch {
+                            return 'Invalid date';
+                          }
+                        })() : 'No data'
+                      }
+                    </p>
                   </div>
                 ) : (
                   <p className="text-gray-500">No health data available</p>
@@ -1074,15 +1039,7 @@ const HealthDataManager = () => {
                   >
                     Export Student Data
                   </button>
-                  <button 
-                    onClick={() => {
-                      closeStudentModal();
-                      toast.info('Health history view will be implemented');
-                    }}
-                    className="w-full bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
-                  >
-                    View Health History
-                  </button>
+                 
                 </div>
               </div>
             </div>

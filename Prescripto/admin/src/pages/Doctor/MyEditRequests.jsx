@@ -107,7 +107,7 @@ const MyEditRequests = () => {
     }
 
     return (
-        <div className="p-6 max-w-7xl mx-auto p-6 space-y-6 h-[calc(100vh-80px)] overflow-y-auto ml-10 w-[1000px]">
+        <div className="max-w-7xl mx-auto p-6 space-y-6 h-[calc(100vh-80px)] overflow-y-auto ml-10 w-[1000px]">
             <div className="mb-6">
                 <h1 className="text-2xl font-semibold text-gray-800 mb-2">📝 My Edit Requests</h1>
                 <p className="text-gray-600">Track your edit access requests for locked exam sessions</p>
@@ -116,7 +116,7 @@ const MyEditRequests = () => {
             {/* Filter Tabs */}
             <div className="mb-6">
                 <div className="border-b border-gray-200">
-                    <nav className="-mb-px flex space-x-8">
+                    <nav className="-mb-px flex space-x-8 pl-[250px]">
                         {[
                             { key: 'all', label: 'All', count: editRequests.length },
                             { key: 'pending', label: 'Pending', count: editRequests.filter(r => r.status === 'pending').length },

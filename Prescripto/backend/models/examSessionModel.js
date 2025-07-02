@@ -16,7 +16,7 @@ const examSessionSchema = new mongoose.Schema({
         type: String,
     },
     examSessionCreatedBy: {
-        type: mongoose.Schema.Types.ObjectId,
+        type: mongoose.Schema.Types.String,
         ref: "User"
     },
     examSessionCreatedAt: {

@@ -29,6 +29,19 @@ import {
     getAllAbnormality,
     getListExamSession
 } from '../controllers/adminController.js';
+
+// Backup Controller
+import {
+    createManualBackup,
+    getAllBackups,
+    getBackupDetails,
+    downloadBackup,
+    verifyBackup,
+    deleteBackup,
+    restoreBackup,
+    getBackupStats,
+    cleanupOldBackups
+} from '../controllers/backupController.js';
 import upload from '../middlewares/multer.js';
 import authAdmin from '../middlewares/authAdmin.js';
 import {changeAvailability } from '../controllers/doctorController.js';
@@ -67,5 +80,16 @@ adminRouter.get('/physical-fitness-by-session', authAdmin, getPhysicalFitnessByS
 adminRouter.get('/all-physical-fitness', authAdmin, getAllPhysicalFitness)
 adminRouter.get('/all-abnormality', authAdmin, getAllAbnormality)
 adminRouter.get('/list-exam-session', authAdmin, getListExamSession)
+
+//--------------------Backup Management Routes--------------------
+adminRouter.post('/backup/create', authAdmin, createManualBackup)
+adminRouter.get('/backup/list', authAdmin, getAllBackups)
+adminRouter.get('/backup/stats', authAdmin, getBackupStats)
+adminRouter.get('/backup/:backupId', authAdmin, getBackupDetails)
+adminRouter.get('/backup/:backupId/download', authAdmin, downloadBackup)
+adminRouter.post('/backup/:backupId/verify', authAdmin, verifyBackup)
+adminRouter.post('/backup/:backupId/restore', authAdmin, restoreBackup)
+adminRouter.delete('/backup/:backupId', authAdmin, deleteBackup)
+adminRouter.post('/backup/cleanup', authAdmin, cleanupOldBackups)
 
 export default adminRouter;

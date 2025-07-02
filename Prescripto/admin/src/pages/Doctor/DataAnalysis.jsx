@@ -9,8 +9,10 @@ const DataAnalysis = () => {
   const [examSessionId, setExamSessionId] = useState("");
   const [autoSelected, setAutoSelected] = useState(false);
   const [examSessions, setExamSessions] = useState([]);
-  const [selectedClass, setSelectedClass] = useState("");
+  const [selectedClass, setSelectedClass] = useState("All");
   const [classes, setClasses] = useState([]);
+  const [selectedMajor, setSelectedMajor] = useState("All");
+  const [majors, setMajors] = useState([]);
   const backendUrl = import.meta.env.VITE_BACKEND_URL;
 
   useEffect(() => {
@@ -38,25 +40,46 @@ const DataAnalysis = () => {
   useEffect(() => {
     if (!examSessionId) {
       setClasses([]);
-      setSelectedClass("");
+      setSelectedClass("All");
+      setMajors([]);
+      setSelectedMajor("All");
       return;
     }
-    axios.get(`${backendUrl}/api/doctor/physical-fitness-by-session?examSessionId=${examSessionId}`)
-      .then(res => {
-        const data = res.data.data || [];
-        const uniqueClasses = [...new Set(data.map(row => row.cohort))].filter(Boolean);
-        setClasses(uniqueClasses);
-        setSelectedClass("");
-      })
-      .catch(() => setClasses([]));
+    
+    // Fetch physical fitness data and students data to get unique classes and majors
+    Promise.all([
+      axios.get(`${backendUrl}/api/doctor/physical-fitness-by-session?examSessionId=${examSessionId}`),
+      axios.get(`${backendUrl}/api/students`)
+    ])
+    .then(([fitnessRes, studentsRes]) => {
+      const fitnessData = fitnessRes.data.data || [];
+      const studentsData = studentsRes.data.students || [];
+      
+      // Get unique classes from fitness data
+      const uniqueClasses = [...new Set(fitnessData.map(row => row.cohort))].filter(Boolean);
+      setClasses(uniqueClasses);
+      setSelectedClass("All");
+      
+      // Get unique majors from students data
+      const uniqueMajors = [...new Set(studentsData.map(row => row.major))].filter(Boolean);
+      setMajors(uniqueMajors);
+      setSelectedMajor("All");
+    })
+    .catch(() => {
+      setClasses([]);
+      setMajors([]);
+    });
   }, [examSessionId]);
 
   useEffect(() => {
     if (!examSessionId) return;
     setLoading(true);
     let url = `${backendUrl}/api/doctor/physical-fitness-status?examSessionId=${examSessionId}`;
-    if (selectedClass && selectedClass !== "" && selectedClass !== "All") {
+    if (selectedClass && selectedClass !== "All") {
       url += `&cohort=${encodeURIComponent(selectedClass)}`;
+    }
+    if (selectedMajor && selectedMajor !== "All") {
+      url += `&major=${encodeURIComponent(selectedMajor)}`;
     }
     axios.get(url)
       .then(res => {
@@ -67,7 +90,7 @@ const DataAnalysis = () => {
         setLoading(false);
         setStats(null);
       });
-  }, [examSessionId, selectedClass]);
+  }, [examSessionId, selectedClass, selectedMajor]);
 
   // Prepare chart data
   const bmiLabels = stats ? Object.keys(stats.bmiStats) : [];
@@ -108,7 +131,6 @@ const DataAnalysis = () => {
 
   const CustomBarChart = ({ data }) => (
     <div className="space-y-3">
-      {console.log("data from bar chart", data)}
       {data.map((item, index) => (
         <div key={index} className="flex items-center space-x-3">
           <div className="w-20 text-sm font-medium text-gray-700">{item.name}</div>
@@ -116,7 +138,7 @@ const DataAnalysis = () => {
             <div
               className="h-full rounded-full transition-all duration-1000 ease-out"
               style={{
-                width: `${(item.value / Math.max(...data.map(d => d.value))) * 100}%`,
+                width: `${data.length > 0 ? (item.value / Math.max(...data.map(d => d.value))) * 100 : 0}%`,
                 backgroundColor: item.fill
               }}
             />
@@ -194,54 +216,68 @@ const DataAnalysis = () => {
         {/* Filters */}
         <div className="bg-white rounded-xl shadow-lg p-6 mb-8 border border-gray-100">
           <h3 className="text-lg font-semibold text-gray-800 mb-4">Filters & Options</h3>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-            <select onChange={(e) => setExamSessionId(e.target.value)} value={examSessionId} className="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
-              {examSessions.length === 0 && <option value="">No exam session</option>}
-              {examSessions.length > 0 && 
-                [...examSessions]
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="flex flex-col">
+              <label className="text-sm font-medium text-gray-700 mb-1">Academic Year</label>
+              <select onChange={(e) => setExamSessionId(e.target.value)} value={examSessionId} className="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
+                {examSessions.length === 0 && <option value="">No exam session</option>}
+                {examSessions.length > 0 && 
+                  [...examSessions]
+                    .sort((a, b) => {
+                      const getYear = (s) => {
+                        if (s.examSessionAcademicYear) {
+                          const y = parseInt(String(s.examSessionAcademicYear).split('-')[0]);
+                          return isNaN(y) ? 0 : y;
+                        }
+                        return s.createdAt ? new Date(s.createdAt).getFullYear() : 0;
+                      };
+                      return getYear(b) - getYear(a); // Descending order (newest first)
+                    })
+                    .map(session => (
+                      <option key={session._id} value={session._id}>{session.examSessionAcademicYear}</option>
+                    ))
+                }
+              </select>
+            </div>
+            <div className="flex flex-col">
+              <label className="text-sm font-medium text-gray-700 mb-1">Class</label>
+              <select
+                className="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                value={selectedClass}
+                onChange={e => setSelectedClass(e.target.value)}
+                disabled={classes.length === 0}
+              >
+                <option value="All">All Classes</option>
+                {classes
+                  .slice()
                   .sort((a, b) => {
-                    const getYear = (s) => {
-                      if (s.examSessionAcademicYear) {
-                        const y = parseInt(String(s.examSessionAcademicYear).split('-')[0]);
-                        return isNaN(y) ? 0 : y;
-                      }
-                      return s.createdAt ? new Date(s.createdAt).getFullYear() : 0;
-                    };
-                    return getYear(b) - getYear(a); // Descending order (newest first)
+                    const numA = parseInt(a.match(/\d+/)?.[0] || '0', 10);
+                    const numB = parseInt(b.match(/\d+/)?.[0] || '0', 10);
+                    if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+                    return a.toLowerCase().localeCompare(b.toLowerCase(), undefined, { numeric: true });
                   })
-                  .map(session => (
-                    <option key={session._id} value={session._id}>{session.examSessionAcademicYear}</option>
-                  ))
-              }
-            </select>
-            <select
-              className="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-              value={selectedClass}
-              onChange={e => setSelectedClass(e.target.value)}
-              disabled={classes.length === 0}
-            >
-              <option value="All">All</option>
-              {classes
-                .slice()
-                .sort((a, b) => {
-                  const numA = parseInt(a.match(/\d+/)?.[0] || '0', 10);
-                  const numB = parseInt(b.match(/\d+/)?.[0] || '0', 10);
-                  if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
-                  return a.toLowerCase().localeCompare(b.toLowerCase(), undefined, { numeric: true });
-                })
-                .map(cls => (
-                  <option key={cls} value={cls}>{cls}</option>
-                ))}
-            </select>
-            <select className="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
-              <option>Health Tracking</option>
-            </select>
-            <select className="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
-              <option>1st Assessment</option>
-            </select>
-            <select className="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
-              <option>Combined View</option>
-            </select>
+                  .map(cls => (
+                    <option key={cls} value={cls}>{cls}</option>
+                  ))}
+              </select>
+            </div>
+            <div className="flex flex-col">
+              <label className="text-sm font-medium text-gray-700 mb-1">Major</label>
+              <select
+                className="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                value={selectedMajor}
+                onChange={e => setSelectedMajor(e.target.value)}
+                disabled={majors.length === 0}
+              >
+                <option value="All">All Majors</option>
+                {majors
+                  .slice()
+                  .sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()))
+                  .map(major => (
+                    <option key={major} value={major}>{major}</option>
+                  ))}
+              </select>
+            </div>
           </div>
         </div>
 

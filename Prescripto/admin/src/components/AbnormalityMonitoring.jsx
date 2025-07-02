@@ -119,11 +119,6 @@ const AbnormalityMonitoring = ({ abnormalitiesData, onExport }) => {
     setShowDetailModal(true);
   };
 
-  const handleFollowUp = (abnormality) => {
-    toast.info(`Follow-up scheduled for ${abnormality.studentName} (ID: ${abnormality.studentId})`);
-    // TODO: Implement follow-up functionality
-  };
-
   const closeDetailModal = () => {
     setShowDetailModal(false);
     setSelectedAbnormality(null);
@@ -273,12 +268,6 @@ const AbnormalityMonitoring = ({ abnormalitiesData, onExport }) => {
                       >
                         View
                       </button>
-                      <button 
-                        onClick={() => handleFollowUp(item)}
-                        className="text-yellow-600 hover:text-yellow-900"
-                      >
-                        Follow-up
-                      </button>
                     </td>
                   </tr>
                 );
@@ -381,25 +370,6 @@ const AbnormalityMonitoring = ({ abnormalitiesData, onExport }) => {
                 <p className="text-gray-700">
                   {selectedAbnormality.temporaryTreatment || 'No treatment notes recorded'}
                 </p>
-              </div>
-
-              {/* Actions */}
-              <div className="flex space-x-4">
-                <button 
-                  onClick={() => handleFollowUp(selectedAbnormality)}
-                  className="bg-yellow-600 text-white px-4 py-2 rounded-lg hover:bg-yellow-700"
-                >
-                  Schedule Follow-up
-                </button>
-                <button 
-                  onClick={() => {
-                    // TODO: Add print functionality
-                    toast.info('Print functionality will be implemented');
-                  }}
-                  className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
-                >
-                  Print Report
-                </button>
               </div>
             </div>
           </div>

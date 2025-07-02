@@ -20,10 +20,12 @@ const DrugStock = () => {
     const [showExpiringModal, setShowExpiringModal] = useState(false);
     const [showLowStockModal, setShowLowStockModal] = useState(false);
 
+    const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:9000';
+
     const fetchDrugs = async () => {
         setLoading(true);
         try {
-            const res = await axios.get('http://localhost:9000/api/doctor/get-drug-stock');
+            const res = await axios.get(`${backendUrl}/api/doctor/get-drug-stock`);
             setDrugs(res.data.data || []);
         } catch (err) {
             setError('Error loading drug list');
@@ -56,12 +58,27 @@ const DrugStock = () => {
     const handleDelete = async (drugId) => {
         if (window.confirm('Are you sure you want to delete this drug?')) {
             try {
-                const res = await axios.delete(`http://localhost:9000/api/doctor/delete-drug/${drugId}`);
+                console.log('Attempting to delete drug with ID:', drugId);
+                console.log('Using backend URL:', backendUrl);
+                
+                const res = await axios.delete(`${backendUrl}/api/doctor/delete-drug/${drugId}`);
+                
+                console.log('Delete response:', res.data);
+                
                 if (res.data.success) {
-                    setDrugs(drugs.filter(drug => drug._id !== drugId));
+                    // Update local state to remove deleted drug
+                    setDrugs(prevDrugs => prevDrugs.filter(drug => drug._id !== drugId));
+                    alert('Drug deleted successfully!');
+                } else {
+                    alert('Failed to delete drug: ' + (res.data.message || 'Unknown error'));
                 }
             } catch (err) {
                 console.error('Error deleting drug:', err);
+                console.error('Error details:', err.response?.data);
+                
+                // Show detailed error message to user
+                const errorMessage = err.response?.data?.message || err.message || 'Failed to delete drug';
+                alert('Error: ' + errorMessage);
             }
         }
     };

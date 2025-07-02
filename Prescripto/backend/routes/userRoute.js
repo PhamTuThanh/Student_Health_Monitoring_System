@@ -1,6 +1,6 @@
 import express from 'express';
 import { registerUser, loginUser, getProfile, updateProfile, bookAppoinment, listAppoinment, 
-cancelAppoinment,  createPayPalPayment,handlePayPalSuccess,handlePayPalCancel, sendEmail, getUsersForChat, getDoctorsForChat, getPhysicalData, saveChatHistory, getChatHistory,
+cancelAppoinment,  createPayPalPayment,handlePayPalSuccess,handlePayPalCancel, sendEmail, getUsersForChat, getDoctorsForChat, getPhysicalData, getExamSessions, compareHealthData, saveChatHistory, getChatHistory,
 getAnnouncements, forgotPassword, changePassword, getHealthScores, getAbnormalityByStudentId, getPrescriptionByStudentId} from '../controllers/userController.js';
 import { verifyToken } from '../middlewares/auth.js';
 import upload from '../middlewares/multer.js';
@@ -29,4 +29,6 @@ userRouter.post('/change-password', verifyToken, changePassword)
 userRouter.get('/get-health-scores/:studentId', verifyToken, getHealthScores)
 userRouter.get('/get-abnormality/:studentId', verifyToken, getAbnormalityByStudentId)
 userRouter.get('/get-prescription/:studentId', verifyToken, getPrescriptionByStudentId)
+userRouter.get('/get-exam-sessions/:studentId', verifyToken, getExamSessions)
+userRouter.get('/compare-health-data/:studentId', verifyToken, compareHealthData)
 export default userRouter;  

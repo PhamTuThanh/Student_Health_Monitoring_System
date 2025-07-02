@@ -61,17 +61,7 @@ const ReportsAndSettings = ({
     ));
   };
 
-  const addNewSchedule = () => {
-    const name = prompt('Enter schedule name:');
-    if (name) {
-      setSchedules(prev => [...prev, {
-        id: Date.now(),
-        name,
-        description: 'Custom schedule',
-        active: false
-      }]);
-    }
-  };
+
 
   return (
     <div className="space-y-6">
@@ -160,129 +150,7 @@ const ReportsAndSettings = ({
                 Export Excel
               </button>
             </div>
-          </div>
-
-          {/* Custom Report Builder */}
-          <div className="bg-white p-6 rounded-lg shadow-md">
-            <h3 className="text-lg font-medium mb-4">Custom Report Builder</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Data Range</label>
-                <div className="space-y-2">
-                  <input 
-                    type="date" 
-                    value={customReport.startDate}
-                    onChange={(e) => setCustomReport(prev => ({ ...prev, startDate: e.target.value }))}
-                    className="border border-gray-300 rounded-lg px-3 py-2 w-full" 
-                    placeholder="Start Date" 
-                  />
-                  <input 
-                    type="date" 
-                    value={customReport.endDate}
-                    onChange={(e) => setCustomReport(prev => ({ ...prev, endDate: e.target.value }))}
-                    className="border border-gray-300 rounded-lg px-3 py-2 w-full" 
-                    placeholder="End Date" 
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Include Sections</label>
-                <div className="space-y-2">
-                  <label className="flex items-center">
-                    <input 
-                      type="checkbox" 
-                      className="mr-2" 
-                      checked={customReport.sections.studentHealth}
-                      onChange={(e) => setCustomReport(prev => ({
-                        ...prev,
-                        sections: { ...prev.sections, studentHealth: e.target.checked }
-                      }))}
-                    />
-                    <span>Student Health Summary</span>
-                  </label>
-                  <label className="flex items-center">
-                    <input 
-                      type="checkbox" 
-                      className="mr-2" 
-                      checked={customReport.sections.bmiAnalytics}
-                      onChange={(e) => setCustomReport(prev => ({
-                        ...prev,
-                        sections: { ...prev.sections, bmiAnalytics: e.target.checked }
-                      }))}
-                    />
-                    <span>BMI Analytics</span>
-                  </label>
-                  <label className="flex items-center">
-                    <input 
-                      type="checkbox" 
-                      className="mr-2" 
-                      checked={customReport.sections.abnormalities}
-                      onChange={(e) => setCustomReport(prev => ({
-                        ...prev,
-                        sections: { ...prev.sections, abnormalities: e.target.checked }
-                      }))}
-                    />
-                    <span>Abnormalities Detail</span>
-                  </label>
-                  <label className="flex items-center">
-                    <input 
-                      type="checkbox" 
-                      className="mr-2" 
-                      checked={customReport.sections.trends}
-                      onChange={(e) => setCustomReport(prev => ({
-                        ...prev,
-                        sections: { ...prev.sections, trends: e.target.checked }
-                      }))}
-                    />
-                    <span>Trends Analysis</span>
-                  </label>
-                </div>
-              </div>
-            </div>
-            <button 
-              onClick={generateCustomReport}
-              className="mt-4 bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700"
-            >
-              Generate Custom Report
-            </button>
-          </div>
-
-          {/* Scheduled Reports */}
-          <div className="bg-white p-6 rounded-lg shadow-md">
-            <h3 className="text-lg font-medium mb-4">Scheduled Reports</h3>
-            <div className="space-y-4">
-              {schedules.map(schedule => (
-                <div key={schedule.id} className="flex items-center justify-between p-4 border rounded-lg">
-                  <div>
-                    <h4 className="font-medium">{schedule.name}</h4>
-                    <p className="text-sm text-gray-600">{schedule.description}</p>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <span className={`text-sm ${schedule.active ? 'text-green-600' : 'text-gray-500'}`}>
-                      {schedule.active ? 'Active' : 'Inactive'}
-                    </span>
-                    <button 
-                      onClick={() => toggleSchedule(schedule.id)}
-                      className={`px-3 py-1 text-xs rounded ${
-                        schedule.active 
-                          ? 'bg-red-100 text-red-600 hover:bg-red-200' 
-                          : 'bg-green-100 text-green-600 hover:bg-green-200'
-                      }`}
-                    >
-                      {schedule.active ? 'Disable' : 'Enable'}
-                    </button>
-                    <button className="text-blue-600 hover:text-blue-800">Edit</button>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <button 
-              onClick={addNewSchedule}
-              className="mt-4 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
-            >
-              Add New Schedule
-            </button>
-          </div>
+          </div> 
         </div>
       )}
 

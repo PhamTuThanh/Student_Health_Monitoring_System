@@ -3,6 +3,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   LineChart, Line, PieChart, Pie, Cell, AreaChart, Area
 } from 'recharts';
+import AcademicYearComparison from './AcademicYearComparison';
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d', '#ffc658', '#ff7300'];
 
@@ -30,7 +31,7 @@ const HealthAnalytics = ({ analyticsData }) => {
             <div className="ml-3">
               <p className="text-sm text-yellow-700">
                 <strong>No Health Data Available</strong><br />
-                There is currently no valid health data to display analytics. Please ensure that students have completed their health examinations and the data has been properly recorded.
+                There is currently no valid health data to display analytics for the selected year. Please ensure that students have completed their health examinations and the data has been properly recorded.
               </p>
             </div>
           </div>
@@ -40,7 +41,7 @@ const HealthAnalytics = ({ analyticsData }) => {
       {/* BMI Distribution */}
       {analyticsData.bmiDistribution && analyticsData.bmiDistribution.some(item => item.count > 0) && (
         <div className="bg-white p-6 rounded-lg shadow-md">
-          <h3 className="text-lg font-medium mb-4">BMI Distribution</h3>
+          <h3 className="text-lg font-medium mb-4">BMI Distribution (Selected Year)</h3>
           <ResponsiveContainer width="100%" height={300}>
             <BarChart data={analyticsData.bmiDistribution}>
               <CartesianGrid strokeDasharray="3 3" />
@@ -72,13 +73,16 @@ const HealthAnalytics = ({ analyticsData }) => {
         </div>
       )}
 
+      {/* Academic Year Comparison - Separate Component */}
+      <AcademicYearComparison />
+
       {/* Two column layout for smaller charts */}
       {(analyticsData.abnormalityBreakdown?.length > 0 || analyticsData.cohortComparison?.some(cohort => cohort.totalStudents > 0)) && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Abnormality Breakdown */}
           {analyticsData.abnormalityBreakdown && analyticsData.abnormalityBreakdown.length > 0 && (
             <div className="bg-white p-6 rounded-lg shadow-md">
-              <h3 className="text-lg font-medium mb-4">Most Common Symptoms</h3>
+              <h3 className="text-lg font-medium mb-4">Most Common Symptoms (Selected Year)</h3>
               <ResponsiveContainer width="100%" height={300}>
                 <PieChart>
                   <Pie
@@ -104,7 +108,7 @@ const HealthAnalytics = ({ analyticsData }) => {
           {/* Cohort Comparison */}
           {analyticsData.cohortComparison && analyticsData.cohortComparison.some(cohort => cohort.totalStudents > 0) && (
             <div className="bg-white p-6 rounded-lg shadow-md">
-              <h3 className="text-lg font-medium mb-4">Health Rate by Cohort</h3>
+              <h3 className="text-lg font-medium mb-4">Health Rate by Cohort (Selected Year)</h3>
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={analyticsData.cohortComparison}>
                   <CartesianGrid strokeDasharray="3 3" />
@@ -121,11 +125,12 @@ const HealthAnalytics = ({ analyticsData }) => {
       )}
 
       {/* Summary Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <div className="bg-gradient-to-r from-blue-500 to-blue-600 text-white p-6 rounded-lg">
           <h4 className="text-lg font-medium">Average BMI</h4>
           <p className="text-2xl font-bold">
             {(() => {
+              if (!analyticsData?.bmiDistribution) return 'No Data';
               const totalStudents = analyticsData.bmiDistribution.reduce((acc, item) => acc + item.count, 0);
               if (totalStudents === 0) return 'No Data';
               
@@ -175,6 +180,17 @@ const HealthAnalytics = ({ analyticsData }) => {
               : 0
             }
           </p>
+        </div>
+
+        <div className="bg-gradient-to-r from-indigo-500 to-indigo-600 text-white p-6 rounded-lg">
+          <h4 className="text-lg font-medium">Selected Year Data</h4>
+          <p className="text-2xl font-bold">
+            {analyticsData.bmiDistribution && analyticsData.bmiDistribution.length > 0 
+              ? analyticsData.bmiDistribution.reduce((acc, item) => acc + item.count, 0)
+              : 0
+            }
+          </p>
+          <p className="text-sm opacity-90">Total Students</p>
         </div>
       </div>
     </div>

@@ -13,6 +13,8 @@ import examSessionModel from '../models/examSessionModel.js';
 import prescriptionModel from '../models/prescriptionModel.js';
 import { normalizeCohort } from '../utils/normalize.js';
 import EditRequest from '../models/editRequestModel.js';
+import mongoose from 'mongoose';
+import { calculateBMI, getDanhGiaBMI, isValidBMI, isHealthyBMI } from '../utils/bmiUtils.js';
 
 const changeAvailability = async (req, res) => {
     try {
@@ -210,11 +212,6 @@ function calculateZScoreCN(weight) {
   const sd = 10.2;
   return weight ? ((weight - standard) / sd).toFixed(2) : "";
 }
-function calculateBMI(weight, height) {
-  if (!weight || !height) return "";
-  const heightInMeters = height / 100;
-  return (weight / (heightInMeters * heightInMeters)).toFixed(2);
-}
 function getDanhGiaCC(zScore) {
   if (!zScore) return "";
   const z = parseFloat(zScore);
@@ -230,16 +227,6 @@ function getDanhGiaCN(zScore) {
   if (z < -2) return "NC";
   if (z < 1) return "BT";
   return "NC";
-}
-function getDanhGiaBMI(bmi) {
-  if (!bmi) return "";
-  const bmiValue = parseFloat(bmi);
-  if (bmiValue < 18.5) return "G";
-  if (18.5 <= bmiValue && bmiValue < 22.9) return "BT";
-  if (22.9 <= bmiValue && bmiValue < 24.9) return "TC";
-  if (24.9 <= bmiValue && bmiValue < 29.9) return "BP I";
-  if (29.9 <= bmiValue && bmiValue < 30) return "BP II";
-  return "BP III";
 }
 function getDanhGiaTTH(systolic, diastolic) {
   if (!systolic || !diastolic) return "";
@@ -645,9 +632,13 @@ const getPhysicalFitnessStatus = async (req, res) => {
           : "";
         const cohort = row.cohort ? normalizeCohort(row.cohort) : "";
 
+        // Separate query fields from update fields
+        const queryCondition = {
+          studentId: String(studentId),
+          examSessionId: examSessionId
+        };
+
         const updateData = {
-          studentId: String(studentId), // Ensure it's always a string
-          examSessionId: examSessionId, // Let Mongoose handle ObjectId conversion
           cohort,
           gender: row.gender || "",
           followDate: row.followDate || "",
@@ -667,30 +658,26 @@ const getPhysicalFitnessStatus = async (req, res) => {
           danhGiaHeartRate: heartRate > 0 ? getDanhGiaHeartRate(heartRate) : "",
         };
 
-        console.log('UpdateData studentId:', updateData.studentId);
-        console.log('UpdateData examSessionId:', updateData.examSessionId);
+        console.log('Query condition:', queryCondition);
+        console.log('Update data keys:', Object.keys(updateData));
 
         try {
-          // Check if record exists before upsert - use ObjectId for examSessionId
-          const existingRecord = await physicalFitnessModel.findOne({ 
-            studentId: String(studentId), 
-            examSessionId: examSessionId 
-          });
-
-          console.log('Existing record found:', existingRecord ? 'YES' : 'NO');
+          // Check if record exists first for accurate tracking
+          const existingRecord = await physicalFitnessModel.findOne(queryCondition);
+          const recordExists = !!existingRecord;
+          
+          console.log('Record exists before upsert:', recordExists);
           if (existingRecord) {
             console.log('Existing record _id:', existingRecord._id);
-            console.log('Existing record studentId:', existingRecord.studentId);
-            console.log('StudentId match:', existingRecord.studentId === String(studentId));
           }
 
-          // Use findOneAndUpdate with upsert for proper upsert behavior
+          // Use proper upsert with separated query and update data
           const result = await physicalFitnessModel.findOneAndUpdate(
+            queryCondition,
             { 
-              studentId: String(studentId), 
-              examSessionId: examSessionId 
+              $set: updateData,
+              $setOnInsert: queryCondition // Only set these on insert to ensure query fields are set
             },
-            { $set: updateData },
             { 
               new: true,
               upsert: true,
@@ -698,25 +685,52 @@ const getPhysicalFitnessStatus = async (req, res) => {
             }
           );
 
-          console.log('Result _id:', result._id);
-          console.log('Result studentId:', result.studentId);
+          console.log('Operation result _id:', result._id);
 
-          // Properly track insert vs update
-          if (existingRecord) {
+          // Track based on whether record existed before
+          if (recordExists) {
             updatedCount++;
             updatedStudentIds.push(studentId);
-            console.log('Operation: UPDATE');
+            console.log('Operation: UPDATE (record existed)');
           } else {
             insertedCount++;
-            console.log('Operation: INSERT');
+            console.log('Operation: INSERT (new record)');
           }
         } catch (dbError) {
           console.error(`Database error for student ${studentId}:`, dbError);
-          invalidRows.push({
-            row: data.findIndex(r => String(r.studentId).trim() === studentId) + 1,
-            studentId: studentId,
-            errors: [`Database error: ${dbError.message}`]
-          });
+          
+          // Handle duplicate key error specifically
+          if (dbError.code === 11000) {
+            console.error('Duplicate key error - attempting update instead');
+            try {
+              // If duplicate key error, try a simple update
+              const updateResult = await physicalFitnessModel.findOneAndUpdate(
+                queryCondition,
+                { $set: updateData },
+                { new: true }
+              );
+              
+              if (updateResult) {
+                updatedCount++;
+                updatedStudentIds.push(studentId);
+                console.log('Operation: UPDATE (after duplicate key error)');
+              } else {
+                throw new Error('Update failed after duplicate key error');
+              }
+            } catch (retryError) {
+              invalidRows.push({
+                row: data.findIndex(r => String(r.studentId).trim() === studentId) + 1,
+                studentId: studentId,
+                errors: [`Database error: ${retryError.message}`]
+              });
+            }
+          } else {
+            invalidRows.push({
+              row: data.findIndex(r => String(r.studentId).trim() === studentId) + 1,
+              studentId: studentId,
+              errors: [`Database error: ${dbError.message}`]
+            });
+          }
         }
       }
   
@@ -974,13 +988,38 @@ const getDrugStock = async (req, res) => {
     }
 };
 
-const deleteDrug = async (req, res) => {
+const deleteDrug = async (req, res) => {  
     try {
-        const { id } = req.params;
-        await drugStockModel.findByIdAndDelete(id);
-        res.status(200).json({ success: true, message: 'Drug deleted' });
+        const { drugId } = req.params;
+        
+        if (!drugId) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Drug ID is required' 
+            });
+        }
+
+        const deletedDrug = await drugStockModel.findByIdAndDelete(drugId);
+        
+        if (!deletedDrug) {
+            return res.status(404).json({ 
+                success: false, 
+                message: 'Drug not found' 
+            });
+        }
+
+  
+        res.status(200).json({ 
+            success: true, 
+            message: 'Drug deleted',
+            deletedId: deletedDrug._id 
+        });
     } catch (error) {
-        res.status(500).json({ success: false, message: 'Server error' });
+        console.error('Delete drug error:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Server error: ' + error.message 
+        });
     }
 };
 const updateDrug = async (req, res) => {
@@ -1068,9 +1107,27 @@ const getPhysicalFitnessBySession = async (req, res) => {
                 message: 'examSessionId is required'
             });
         }
-        const data = await physicalFitnessModel.find({ examSessionId });
+        
+        // Try to find with both ObjectId and String to handle data inconsistency
+        const examSessionIdStr = String(examSessionId);
+        
+        // Build query conditions
+        const queryConditions = [
+            { examSessionId: examSessionIdStr } // String match
+        ];
+        
+        // Add ObjectId match only if examSessionId is a valid ObjectId string
+        if (mongoose.Types.ObjectId.isValid(examSessionId)) {
+            queryConditions.push({ examSessionId: new mongoose.Types.ObjectId(examSessionId) });
+        }
+        
+        const data = await physicalFitnessModel.find({ 
+            $or: queryConditions
+        });
+        
         res.status(200).json({ success: true, data });
     } catch (error) {
+        console.error('Backend error:', error);
         res.status(500).json({
             success: false,
             message: 'Error fetching physical fitness data',

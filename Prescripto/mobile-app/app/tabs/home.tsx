@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -15,8 +15,16 @@ import {
 import { assets } from '../../assets/images/assets.js';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { getInfoUser, getPhysicalData, getAbnormality, getHealthScores } from '../services/api/api';
+import { getInfoUser, getPhysicalData, getAbnormality, getHealthScores, getExamSessions, compareHealthData } from '../services/api/api';
 import { useNavigation } from '@react-navigation/native';
+
+// Import components
+import ProfileCard from '../../components/home/ProfileCard';
+import HealthMetricsGrid from '../../components/home/HealthMetricsGrid';
+import ExamSessionSelector from '../../components/home/ExamSessionSelector';
+import ComparisonView from '../../components/home/ComparisonView';
+import OldDataBanner from '../../components/home/OldDataBanner';
+import WelcomeCard from '../../components/home/WelcomeCard';
 
 const { width } = Dimensions.get('window'); 
 
@@ -39,6 +47,61 @@ interface HealthMetrics {
   bmi: string;
   heartRate: number;
   followDate: string;
+  examSessionId?: {
+    _id: string;
+    examSessionName: string;
+    examSessionAcademicYear: string;
+    examSessionDate: string;
+  };
+}
+
+interface ExamSession {
+  _id: string;
+  examSessionName: string;
+  examSessionAcademicYear: string;
+  examSessionDate: string;
+}
+
+interface ComparisonData {
+  session1: {
+    _id: string;
+    name: string;
+    academicYear: string;
+    date: string;
+    height: number;
+    weight: number;
+    bmi: string;
+    systolic: number;
+    diastolic: number;
+    heartRate: number;
+    danhGiaBMI: string;
+    danhGiaTTH: string;
+    [key: string]: any;
+  };
+  session2: {
+    _id: string;
+    name: string;
+    academicYear: string;
+    date: string;
+    height: number;
+    weight: number;
+    bmi: string;
+    systolic: number;
+    diastolic: number;
+    heartRate: number;
+    danhGiaBMI: string;
+    danhGiaTTH: string;
+    [key: string]: any;
+  };
+  differences: {
+    height: number;
+    weight: number;
+    bmi: string;
+    systolic: number;
+    diastolic: number;
+    heartRate: number;
+    [key: string]: any;
+  };
 }
 
 interface HealthScores {
@@ -59,7 +122,7 @@ interface AbnormalityRecord {
   temporaryTreatment: string;
 }
 
-const StudentHealthDashboard: React.FC = () => {
+const StudentHealthDashboard: React.FC = React.memo(() => {
   const navigation = useNavigation();
   const [activeTab, setActiveTab] = useState<string>('overview'); 
   const [studentData, setStudentData] = useState<StudentData | null>(null);
@@ -72,8 +135,18 @@ const StudentHealthDashboard: React.FC = () => {
     mental: 0,
     overall: 0
   });
+  const [examSessions, setExamSessions] = useState<ExamSession[]>([]);
+  const [selectedSession, setSelectedSession] = useState<string>('');
+  const [comparisonData, setComparisonData] = useState<ComparisonData | null>(null);
+  const [showComparison, setShowComparison] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [sessionLoading, setSessionLoading] = useState(false);
+  
+  // New states for handling old data
+  const [hasAnyHealthData, setHasAnyHealthData] = useState(false);
+  const [latestAvailableHealthData, setLatestAvailableHealthData] = useState<HealthMetrics | null>(null);
+  const [isShowingOldData, setIsShowingOldData] = useState(false);
 
   // Animation refs
   const spinValue = useRef(new Animated.Value(0)).current;
@@ -116,8 +189,13 @@ const StudentHealthDashboard: React.FC = () => {
     }
   }, [loading]);
 
-  const fetchAll = useCallback(async (isRefresh = false) => {
+  const fetchAll = useCallback(async (isRefresh = false, examSessionId: string | null = null, isSessionChange = false) => {
     try {
+      // Set appropriate loading state
+      if (isSessionChange) {
+        setSessionLoading(true);
+      }
+
       const user = await getInfoUser();
       
       if (!user?.userData) {
@@ -130,10 +208,33 @@ const StudentHealthDashboard: React.FC = () => {
         throw new Error('Student ID not found');
       }
 
+      // Get exam sessions
       try {
-        const physical = await getPhysicalData(user.userData.studentId);
+        const sessions = await getExamSessions(user.userData.studentId);
+        if (sessions?.success && sessions?.data) {
+          setExamSessions(sessions.data);
+          
+          // Set default to latest session if none selected
+          if (!selectedSession && sessions.data.length > 0) {
+            const latestSessionId = sessions.data[sessions.data.length - 1]._id;
+            setSelectedSession(latestSessionId);
+            examSessionId = latestSessionId;
+          } else if (selectedSession) {
+            examSessionId = selectedSession;
+          }
+        }
+      } catch (sessionError) {
+        console.warn('Failed to fetch exam sessions:', sessionError);
+        setExamSessions([]);
+      }
+
+      try {
+        // First, try to get data for the selected session
+        const physical = await getPhysicalData(user.userData.studentId, examSessionId || undefined);
         
         let latestPhysical = null;
+        let currentSessionHasData = false;
+        
         if (physical?.success && physical?.data) {
           if (Array.isArray(physical.data) && physical.data.length > 0) {
             // get the latest record with all information
@@ -145,8 +246,51 @@ const StudentHealthDashboard: React.FC = () => {
             );
             if (validRecords.length > 0) {
               latestPhysical = validRecords[validRecords.length - 1];
+              currentSessionHasData = true;
             }
           }
+        }
+
+        // If no data for current session, try to get data from any session
+        if (!currentSessionHasData) {
+          try {
+            const allPhysical = await getPhysicalData(user.userData.studentId); // No session filter
+            
+            if (allPhysical?.success && allPhysical?.data) {
+              if (Array.isArray(allPhysical.data) && allPhysical.data.length > 0) {
+                const allValidRecords = allPhysical.data.filter((record: any) => 
+                  record && 
+                  record.height && 
+                  record.weight && 
+                  record.bmi
+                );
+                
+                if (allValidRecords.length > 0) {
+                  // Use the most recent data available
+                  latestPhysical = allValidRecords[allValidRecords.length - 1];
+                  setHasAnyHealthData(true);
+                  setLatestAvailableHealthData(latestPhysical);
+                  setIsShowingOldData(true);
+                } else {
+                  setHasAnyHealthData(false);
+                  setIsShowingOldData(false);
+                }
+              } else {
+                setHasAnyHealthData(false);
+                setIsShowingOldData(false);
+              }
+            } else {
+              setHasAnyHealthData(false);
+              setIsShowingOldData(false);
+            }
+          } catch (allDataError) {
+            console.warn('Failed to fetch all physical data:', allDataError);
+            setHasAnyHealthData(false);
+            setIsShowingOldData(false);
+          }
+        } else {
+          setHasAnyHealthData(true);
+          setIsShowingOldData(false);
         }
         
         setHealthMetrics(latestPhysical);
@@ -154,6 +298,8 @@ const StudentHealthDashboard: React.FC = () => {
       } catch (physicalError) {
         console.warn('Failed to fetch physical data:', physicalError);
         setHealthMetrics(null);
+        setHasAnyHealthData(false);
+        setIsShowingOldData(false);
       }
 
       try {
@@ -188,21 +334,147 @@ const StudentHealthDashboard: React.FC = () => {
         ]
       );
     } finally {
-      if (!isRefresh) {
+      if (!isRefresh && !isSessionChange) {
         setLoading(false);
+      }
+      if (isSessionChange) {
+        setSessionLoading(false);
       }
       setRefreshing(false);
     }
-  }, []);
+  }, [selectedSession]);
 
   useEffect(() => {
     fetchAll();
-  }, [fetchAll]);
+  }, []);
+
+  // Fetch data when selected session changes
+  useEffect(() => {
+    if (selectedSession && studentData?.studentId) {
+      fetchAll(false, selectedSession, true);
+    }
+  }, [selectedSession, studentData?.studentId]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    fetchAll(true);
-  }, [fetchAll]);
+    fetchAll(true, selectedSession || null);
+  }, [fetchAll, selectedSession]);
+
+  // Function to handle comparison between two exam sessions
+  const handleCompareData = async () => {
+    // Basic validation
+    if (!studentData?.studentId) {
+      Alert.alert('Error', 'Student information not found. Please try again.');
+      return;
+    }
+
+    if (examSessions.length < 2) {
+      Alert.alert(
+        'Comparison not available', 
+        'You need at least 2 exam sessions to compare data.\n\nPlease complete more health checkups to enable comparison feature.'
+      );
+      return;
+    }
+
+    try {
+      // Array is sorted from oldest to newest
+      // examSessions[0] = oldest, examSessions[length-1] = newest
+      const latestSession = examSessions[examSessions.length - 1]; // Newest (last element)
+      const previousSession = examSessions[examSessions.length - 2]; // Previous (second to last)
+      
+      // Validate sessions
+      if (!latestSession?._id || !previousSession?._id) {
+        Alert.alert('Error', 'Invalid exam session data. Please try again.');
+        return;
+      }
+
+      console.log('Comparing sessions:', {
+        previous: previousSession.examSessionAcademicYear,
+        latest: latestSession.examSessionAcademicYear
+      });
+      
+      // Call API with old session first, then new session
+      // This ensures session1 = old data, session2 = new data
+      const comparison = await compareHealthData(
+        studentData.studentId,
+        previousSession._id, // Old session first
+        latestSession._id    // New session second
+      );
+
+      console.log('Comparison API response:', comparison);
+
+      // Validate API response
+      if (!comparison) {
+        Alert.alert('Error', 'No response from server. Please check your connection and try again.');
+        return;
+      }
+
+      if (!comparison.success) {
+        const errorMessage = comparison.message || 'Unknown error occurred';
+        Alert.alert('Comparison Failed', errorMessage);
+        return;
+      }
+
+      if (!comparison.data) {
+        Alert.alert(
+          'No Data Available', 
+          'No health data found for one or both exam sessions.\n\nPlease ensure you have completed health checkups for both sessions.'
+        );
+        return;
+      }
+
+      // Validate comparison data structure
+      const { session1, session2, differences } = comparison.data;
+      
+      if (!session1 || !session2) {
+        Alert.alert(
+          'Incomplete Data', 
+          'Health data is missing for one of the exam sessions.\n\nComparison requires complete data from both sessions.'
+        );
+        return;
+      }
+
+      // Check if sessions have required health metrics
+      const requiredFields = ['height', 'weight', 'bmi', 'systolic', 'diastolic', 'heartRate'];
+      const session1Missing = requiredFields.filter(field => !session1[field] && session1[field] !== 0);
+      const session2Missing = requiredFields.filter(field => !session2[field] && session2[field] !== 0);
+
+      if (session1Missing.length > 0 || session2Missing.length > 0) {
+        let message = 'Some health metrics are missing:\n\n';
+        if (session1Missing.length > 0) {
+          message += `${session1.academicYear}: ${session1Missing.join(', ')}\n`;
+        }
+        if (session2Missing.length > 0) {
+          message += `${session2.academicYear}: ${session2Missing.join(', ')}\n`;
+        }
+        message += '\nPlease complete all health measurements to enable full comparison.';
+        
+        Alert.alert('Incomplete Health Data', message);
+        return;
+      }
+
+      // Success - show comparison
+      setComparisonData(comparison.data);
+      setShowComparison(true);
+      
+    } catch (error) {
+      console.error('Error comparing data:', error);
+      
+      let errorMessage = 'Failed to compare health data. Please try again.';
+      
+      if (error instanceof Error) {
+        if (error.message.includes('Network')) {
+          errorMessage = 'Network error. Please check your internet connection and try again.';
+        } else if (error.message.includes('timeout')) {
+          errorMessage = 'Request timeout. Please try again.';
+        } else if (error.message.includes('404')) {
+          errorMessage = 'Health data not found for comparison.';
+        }
+      }
+      
+      Alert.alert('Error', errorMessage);
+    }
+  };
 
   const getBMIStatus = (bmi: string) => {
     const bmiNum = parseFloat(bmi);
@@ -262,14 +534,38 @@ const StudentHealthDashboard: React.FC = () => {
     );
   };
 
-  const renderHealthMetricCard = (
-    icon: keyof typeof Ionicons.glyphMap, 
-    title: string,
-    value: string,
-    subtitle: string,
-    color: string,
-    trend?: { direction: 'up' | 'down'; text: string }
-  ) => (
+  // Memoized computed values for better performance
+  const memoizedBMIStatus = useMemo(() => {
+    if (!healthMetrics?.bmi) return { status: 'No Data', color: '#808080' };
+    return getBMIStatus(healthMetrics.bmi);
+  }, [healthMetrics?.bmi]);
+
+  const memoizedHealthScoreColor = useMemo(() => {
+    return getHealthScoreColor(healthMetrics?.heartRate || 0);
+  }, [healthMetrics?.heartRate]);
+
+  const memoizedHealthScoreStatus = useMemo(() => {
+    return getHealthScoreStatus(healthMetrics?.heartRate || 0);
+  }, [healthMetrics?.heartRate]);
+
+  // Memoized validation checks
+  const hasValidHealthMetrics = useMemo(() => {
+    return healthMetrics && 
+      healthMetrics.height && 
+      healthMetrics.weight && 
+      healthMetrics.bmi;
+  }, [healthMetrics]);
+
+  // Memoized component sections
+  const MemoizedHealthMetricCard = React.memo(({ 
+    icon, title, value, subtitle, color 
+  }: {
+    icon: keyof typeof Ionicons.glyphMap;
+    title: string;
+    value: string;
+    subtitle: string;
+    color: string;
+  }) => (
     <View style={styles.metricCard}>
       <View style={styles.metricHeader}>
         <View style={[styles.iconContainer, { backgroundColor: color + '20' }]}>
@@ -278,22 +574,11 @@ const StudentHealthDashboard: React.FC = () => {
         <Text style={styles.metricTitle}>{title}</Text>
       </View>
       <Text style={styles.metricValue}>{value}</Text>
-      {trend ? (
-        <View style={styles.trendContainer}>
-          <Ionicons
-            name={trend.direction === 'up' ? 'trending-up' : 'trending-down'}
-            size={12}
-            color={trend.direction === 'up' ? '#10B981' : '#EF4444'} 
-          />
-          <Text style={styles.trendText}>{trend.text}</Text>
-        </View>
-      ) : (
-        <Text style={styles.metricSubtitle}>{subtitle}</Text>
-      )}
+      <Text style={styles.metricSubtitle}>{subtitle}</Text>
     </View>
-  );
+  ));
 
-  const renderProgressBar = (value: number) => (
+  const MemoizedProgressBar = React.memo(({ value }: { value: number }) => (
     <View style={styles.progressBarContainer}>
       <View style={styles.progressBarBg}>
         <View
@@ -310,18 +595,12 @@ const StudentHealthDashboard: React.FC = () => {
         {value}%
       </Text>
     </View>
-  );
+  ));
 
   const spin = spinValue.interpolate({
     inputRange: [0, 1],
     outputRange: ['0deg', '360deg'],
   });
-
-  // Cải thiện logic kiểm tra healthMetrics
-  const hasValidHealthMetrics = healthMetrics && 
-    healthMetrics.height && 
-    healthMetrics.weight && 
-    healthMetrics.bmi;
 
   if (loading) {
     return (
@@ -356,7 +635,8 @@ const StudentHealthDashboard: React.FC = () => {
     );
   }
 
-  if (!hasValidHealthMetrics) {
+  // Show welcome card only if student has NO health data at all
+  if (!hasAnyHealthData) {
     return (
       <SafeAreaView style={styles.container}>
         <LinearGradient
@@ -396,144 +676,11 @@ const StudentHealthDashboard: React.FC = () => {
               />
             }
           >
-            {/* Welcome Card for New Student */}
-            <View style={styles.welcomeCard}>
-              <LinearGradient
-                colors={['#60A5FA', '#10B981']}
-                style={styles.welcomeGradient}
-              >
-                <View style={styles.welcomeHeader}>
-                  <Ionicons name="medical-outline" size={48} color="white" />
-                  <Text style={styles.welcomeTitle}>Welcome to UTC2!</Text>
-                  <Text style={styles.welcomeSubtitle}>
-                    Hello {studentData.name}, we haven't found any health data for you.
-                  </Text>
-                </View>
-              </LinearGradient>
-              
-              <View style={styles.welcomeContent}>
-                <Text style={styles.welcomeMessage}>
-                  To start tracking your health, you need to perform your first health check at UTC2 Health Department
-                </Text>
-                
-                <View style={styles.instructionSteps}>
-                  <View style={styles.stepItem}>
-                    <View style={styles.stepIcon}>
-                      <Text style={styles.stepNumber}>1</Text>
-                    </View>
-                    <View style={styles.stepContent}>
-                      <Text style={styles.stepTitle}>Register for a health check</Text>
-                      <Text style={styles.stepDescription}>Contact the Health Department to more information</Text>
-                    </View>
-                  </View>
-                  
-                  <View style={styles.stepItem}>
-                    <View style={styles.stepIcon}>
-                      <Text style={styles.stepNumber}>2</Text>
-                    </View>
-                    <View style={styles.stepContent}>
-                      <Text style={styles.stepTitle}>Perform a health check</Text>
-                      <Text style={styles.stepDescription}>Measure height, weight, blood pressure and other indicators</Text>
-                    </View>
-                  </View>
-                  
-                  <View style={styles.stepItem}>
-                    <View style={styles.stepIcon}>
-                      <Text style={styles.stepNumber}>3</Text>
-                    </View>
-                    <View style={styles.stepContent}>
-                      <Text style={styles.stepTitle}>Track results</Text>
-                      <Text style={styles.stepDescription}>Data will be updated and displayed here</Text>
-                    </View>
-                  </View>
-                </View>
-
-                <TouchableOpacity style={styles.contactButton} onPress={handleContactHealthCenter}>
-                  <Ionicons name="chatbubble-outline" size={20} color="white" />
-                  <Text style={styles.contactButtonText}>Chat with a doctor</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            {/* Student Profile Card */}
-            <View style={styles.profileCard}>
-              <View style={styles.profileHeader}>
-                <LinearGradient
-                  colors={['#60A5FA', '#10B981']}
-                  style={styles.avatar}
-                >
-                  <Text style={styles.avatarText}>{studentData?.name?.charAt(0)}</Text>
-                </LinearGradient>
-                <View style={styles.profileInfo}>
-                  <View style={styles.nameContainer}>
-                    <Text style={styles.studentName}>{studentData?.name}</Text>
-                    <View style={styles.classBadge}>
-                      <Text style={styles.classBadgeText}>{studentData?.cohort}</Text>
-                    </View>
-                  </View>
-                  <View style={styles.studentDetails}>
-                    <View style={styles.detailRow}>
-                      <Ionicons name="book-outline" size={14} color="#6B7280" />
-                      <Text style={styles.detailText}>ID: {studentData?.studentId}</Text>
-                    </View>
-                    <View style={styles.detailRow}>
-                      <Ionicons name="person-outline" size={14} color="#6B7280" />
-                      <Text style={styles.detailText}>Major: {studentData?.major}</Text>
-                    </View>
-                    <View style={styles.detailRow}>
-                      <Ionicons name="calendar-outline" size={14} color="#6B7280" />
-                      <Text style={styles.detailText}>DOB: {studentData?.dob}</Text>
-                    </View>
-                    <View style={styles.detailRow}>
-                      <Ionicons name="call-outline" size={14} color="#6B7280" />
-                      <Text style={styles.detailText}>{studentData?.phone}</Text>
-                    </View>
-                  </View>
-                </View>
-              </View>
-            </View>
-
-            {/* Info Cards */}
-            <View style={styles.infoCardsContainer}>
-              <View style={styles.infoCard}>
-                <Ionicons name="shield-checkmark-outline" size={32} color="#10B981" />
-                <Text style={styles.infoCardTitle}>Protect your health</Text>
-                <Text style={styles.infoCardDescription}>
-                  Regular monitoring helps detect health issues early
-                </Text>
-              </View>
-              
-              <View style={styles.infoCard}>
-                <Ionicons name="analytics-outline" size={32} color="#3B82F6" />
-                <Text style={styles.infoCardTitle}>Track Progress</Text>
-                <Text style={styles.infoCardDescription}>
-                  Monitor your health trends and improvements over time
-                </Text>
-              </View>
-            </View>
-
-            {/* Contact Info */}
-            <View style={styles.contactInfoCard}>
-              <View style={styles.contactHeader}>
-                <Ionicons name="medical" size={24} color="#EF4444" />
-                <Text style={styles.contactTitle}>Contact Information</Text>
-              </View>
-              <View style={styles.contactDetails}>
-                <View style={styles.contactRow}>
-                  <Ionicons name="location-outline" size={16} color="#6B7280" />
-                  <Text style={styles.contactText}>UTC2 Health Department</Text>
-                </View>
-                <View style={styles.contactRow}>
-                  <Ionicons name="call-outline" size={16} color="#6B7280" />
-                  <Text style={styles.contactText}>(028).3736.0564</Text>
-                </View>
-                <View style={styles.contactRow}>
-                  <Ionicons name="time-outline" size={16} color="#6B7280" />
-                  <Text style={styles.contactText}>Monday - Friday: 7:00 - 17:30</Text>
-                </View>
-              </View>
-            </View>
-
+            <ProfileCard studentData={studentData} />
+            <WelcomeCard 
+              studentData={studentData} 
+              onContactHealthCenter={handleContactHealthCenter} 
+            />
           </ScrollView>
         </LinearGradient>
       </SafeAreaView>
@@ -581,43 +728,30 @@ const StudentHealthDashboard: React.FC = () => {
             />
           }
         >
+          {/* Old Data Warning Banner */}
+          <OldDataBanner 
+            isShowingOldData={isShowingOldData}
+            latestAvailableHealthData={latestAvailableHealthData}
+            onScheduleCheckup={handleContactHealthCenter}
+          />
+
           {/* Student Profile Card */}
-          <View style={styles.profileCard}>
-            <View style={styles.profileHeader}>
-              <LinearGradient
-                colors={['#60A5FA', '#10B981']}
-                style={styles.avatar}
-              >
-                <Text style={styles.avatarText}>{studentData?.name?.charAt(0)}</Text>
-              </LinearGradient>
-              <View style={styles.profileInfo}>
-                <View style={styles.nameContainer}>
-                  <Text style={styles.studentName}>{studentData?.name}</Text>
-                  <View style={styles.classBadge}>
-                    <Text style={styles.classBadgeText}>{studentData?.cohort}</Text>
-                  </View>
-                </View>
-                <View style={styles.studentDetails}>
-                  <View style={styles.detailRow}>
-                    <Ionicons name="book-outline" size={14} color="#6B7280" />
-                    <Text style={styles.detailText}>ID: {studentData?.studentId}</Text>
-                  </View>
-                  <View style={styles.detailRow}>
-                    <Ionicons name="person-outline" size={14} color="#6B7280" />
-                    <Text style={styles.detailText}>Major: {studentData?.major}</Text>
-                  </View>
-                  <View style={styles.detailRow}>
-                    <Ionicons name="calendar-outline" size={14} color="#6B7280" />
-                    <Text style={styles.detailText}>DOB: {studentData?.dob}</Text>
-                  </View>
-                  <View style={styles.detailRow}>
-                    <Ionicons name="call-outline" size={14} color="#6B7280" />
-                    <Text style={styles.detailText}>{studentData?.phone}</Text>
-                  </View>
-                </View>
-              </View>
-            </View>
-          </View>
+          <ProfileCard studentData={studentData} />
+
+          {/* Exam Session Selector */}
+          <ExamSessionSelector 
+            examSessions={examSessions}
+            selectedSession={selectedSession}
+            onSessionSelect={setSelectedSession}
+            onCompare={handleCompareData}
+          />
+
+          {/* Comparison View */}
+          <ComparisonView 
+            showComparison={showComparison}
+            comparisonData={comparisonData}
+            onClose={() => setShowComparison(false)}
+          />
 
           {/* Abnormality Card */}
           <View style={styles.card}>
@@ -649,37 +783,7 @@ const StudentHealthDashboard: React.FC = () => {
           </View>
 
           {/* Health Metrics */}
-          <View style={styles.metricsGrid}>
-            {renderHealthMetricCard(
-              'resize-outline', // Valid Ionicons name
-              'Height',
-              `${healthMetrics?.height} cm`,
-              'Normal range',
-              '#3B82F6'
-            )}
-            {renderHealthMetricCard(
-              'fitness-outline', // Valid Ionicons name
-              'Weight',
-              `${healthMetrics?.weight} kg`,
-              'Normal range',
-              '#10B981',
-              { direction: 'down', text: '-2kg from last month' }
-            )}
-            {renderHealthMetricCard(
-              'bar-chart-outline', // Valid Ionicons name
-              'BMI',
-              `${healthMetrics?.bmi}`,
-              getBMIStatus(healthMetrics?.bmi || '0').status,
-              getBMIStatus(healthMetrics?.bmi || '0').color
-            )}
-            {renderHealthMetricCard(
-              'heart-outline', 
-              'Heart Rate',
-              `${healthMetrics?.heartRate} bpm`,
-              getHealthScoreStatus(healthMetrics?.heartRate || 0),
-              getHealthScoreColor(healthMetrics?.heartRate || 0)
-            )}
-          </View>
+          {healthMetrics && <HealthMetricsGrid healthMetrics={healthMetrics} />}
 
           {/* Health Scores */}
           <View style={styles.card}>
@@ -700,7 +804,22 @@ const StudentHealthDashboard: React.FC = () => {
                     <Text style={styles.scoreLabel}>
                       {key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
                     </Text>
-                    {renderProgressBar(value as number)}
+                    <View style={styles.progressBarContainer}>
+                      <View style={styles.progressBarBg}>
+                        <View
+                          style={[
+                            styles.progressBarFill,
+                            {
+                              width: `${value as number}%`,
+                              backgroundColor: getHealthScoreColor(value as number)
+                            }
+                          ]}
+                        />
+                      </View>
+                      <Text style={[styles.progressText, { color: getHealthScoreColor(value as number) }]}>
+                        {value as number}%
+                      </Text>
+                    </View>
                   </View>
                 ))}
             </View>
@@ -792,7 +911,7 @@ const StudentHealthDashboard: React.FC = () => {
       </LinearGradient>
     </SafeAreaView>
   );
-};
+});
 
 const styles = StyleSheet.create({
   container: {
@@ -1257,166 +1376,6 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     flex: 1, 
   },
-  welcomeCard: {
-    backgroundColor: 'white',
-    borderRadius: 16,
-    marginTop: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
-    overflow: 'hidden',
-  },
-  welcomeGradient: {
-    padding: 24,
-    alignItems: 'center',
-  },
-  welcomeHeader: {
-    alignItems: 'center',
-  },
-  welcomeTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: 'white',
-    marginTop: 16,
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  welcomeSubtitle: {
-    fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.9)',
-    textAlign: 'center',
-    lineHeight: 22,
-  },
-  welcomeContent: {
-    padding: 24,
-  },
-  welcomeMessage: {
-    fontSize: 16,
-    color: '#374151',
-    lineHeight: 24,
-    marginBottom: 24,
-    textAlign: 'center',
-  },
-  instructionSteps: {
-    marginBottom: 24,
-  },
-  stepItem: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 20,
-  },
-  stepIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#3B82F6',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
-  },
-  stepNumber: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: 'white',
-  },
-  stepContent: {
-    flex: 1,
-  },
-  stepTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1F2937',
-    marginBottom: 4,
-  },
-  stepDescription: {
-    fontSize: 14,
-    color: '#6B7280',
-    lineHeight: 20,
-  },
-  contactButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#10B981',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 12,
-  },
-  contactButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
-    marginLeft: 8,
-  },
-  infoCardsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 20,
-  },
-  infoCard: {
-    backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 20,
-    width: '48%',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  infoCardTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1F2937',
-    marginTop: 12,
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  infoCardDescription: {
-    fontSize: 12,
-    color: '#6B7280',
-    textAlign: 'center',
-    lineHeight: 18,
-  },
-  contactInfoCard: {
-    backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 20,
-    marginTop: 20,
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  contactHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  contactTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1F2937',
-    marginLeft: 8,
-  },
-  contactDetails: {
-    marginLeft: 32,
-  },
-  contactRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  contactText: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginLeft: 8,
-  },
   reminderContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1464,6 +1423,175 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     marginLeft: 8,
+  },
+  
+  // Exam Session Selector Styles
+  sessionScrollView: {
+    marginTop: 16,
+  },
+  sessionCard: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    padding: 16,
+    marginRight: 12,
+    minWidth: 140,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  selectedSessionCard: {
+    backgroundColor: '#EFF6FF',
+    borderColor: '#3B82F6',
+  },
+  sessionYear: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1F2937',
+    marginBottom: 4,
+  },
+  selectedSessionText: {
+    color: '#1D4ED8',
+  },
+  sessionName: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginBottom: 2,
+  },
+  selectedSessionSubText: {
+    color: '#3B82F6',
+  },
+  sessionDate: {
+    fontSize: 10,
+    color: '#9CA3AF',
+  },
+  compareButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#10B981',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  compareButtonText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '600',
+    marginLeft: 4,
+  },
+  
+  // Comparison Styles
+  comparisonContainer: {
+    marginTop: 16,
+  },
+  comparisonHeader: {
+    marginBottom: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  comparisonTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1F2937',
+    textAlign: 'center',
+  },
+  comparisonSubtitle: {
+    fontSize: 12,
+    color: '#6B7280',
+    textAlign: 'center',
+    marginTop: 4,
+  },
+  comparisonMetrics: {
+  },
+  comparisonRow: {
+    marginBottom: 16,
+  },
+  comparisonLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 8,
+  },
+  comparisonValues: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  comparisonValueWrapper: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  valueLabel: {
+    fontSize: 10,
+    color: '#9CA3AF',
+    marginBottom: 2,
+    fontWeight: '500',
+  },
+  oldValue: {
+    fontSize: 12,
+    color: '#6B7280',
+    textAlign: 'center',
+  },
+  newValue: {
+    fontSize: 12,
+    color: '#1F2937',
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  changeBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    marginLeft: 8,
+    minWidth: 50,
+    alignItems: 'center',
+  },
+  changeText: {
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  
+  // Old Data Banner Styles
+  oldDataBanner: {
+    backgroundColor: '#FEF3C7',
+    borderRadius: 12,
+    padding: 16,
+    marginTop: 20,
+    borderWidth: 1,
+    borderColor: '#F59E0B',
+  },
+  oldDataBannerContent: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+  },
+  oldDataTextContainer: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  oldDataTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#92400E',
+    marginBottom: 4,
+  },
+  oldDataSubtitle: {
+    fontSize: 12,
+    color: '#92400E',
+    lineHeight: 16,
+  },
+  oldDataAction: {
+    alignItems: 'flex-end',
+  },
+  contactHealthCenterButton: {
+    backgroundColor: '#F59E0B',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  contactHealthCenterText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '600',
   },
 });
 

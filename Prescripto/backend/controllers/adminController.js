@@ -490,7 +490,16 @@ const getExamSessionsWithData = async (req, res) => {
         
         const sessionsWithStats = await Promise.all(
             examSessions.map(async (session) => {
-                const fitnessData = await physicalFitnessModel.find({ examSessionId: session._id });
+                // Handle both ObjectId and String types for examSessionId
+                const fitnessData = await physicalFitnessModel.find({ 
+                    $or: [
+                        { examSessionId: session._id }, // ObjectId match
+                        { examSessionId: String(session._id) } // String match
+                    ]
+                });
+                
+                console.log(`🔍 Session ${session.examSessionAcademicYear} (${session._id}): Found ${fitnessData.length} fitness records`);
+                
                 const totalStudents = fitnessData.length;
                 const completedData = fitnessData.filter(data => 
                     data.height && data.weight && data.systolic && data.diastolic && data.heartRate

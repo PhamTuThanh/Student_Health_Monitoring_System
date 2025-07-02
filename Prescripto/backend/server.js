@@ -14,6 +14,7 @@ import { checkAndSendReminders } from './controllers/reminderController.js';
 import messageRouter from './routes/messageRoute.js';
 import studentRouter from './routes/studentRoute.js';
 import {app, server} from './socket/socket.js'
+import backupScheduler from './utils/backupScheduler.js';
 const port = process.env.PORT || 9000
 
 const corsOptions = {
@@ -61,6 +62,11 @@ const startServer = async () => {
         console.log('MongoDB connected successfully');
         await connectCloudinary();
         console.log('Cloudinary connected successfully');
+        
+        // Start backup scheduler
+        backupScheduler.startScheduler();
+        console.log('Backup scheduler initialized');
+        
         server.listen(port, () => {
             console.log(`Server is running on port ${port}`);
         })
