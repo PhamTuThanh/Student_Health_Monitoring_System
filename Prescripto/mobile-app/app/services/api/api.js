@@ -39,8 +39,12 @@ const changePassword = async (passwordData) => {
     });
     return response.data;
 }
-const getChatbot = async (message) => {
-    const response = await axios.post(`${BACKEND_URL_CHATBOT}/api/chat`, {message})
+const getChatbot = async (message, studentId, studentName) => {
+    const response = await axios.post(`${BACKEND_URL_CHATBOT}/api/chat`, {
+        message,
+        studentId,
+        studentName
+    })
     return response.data
 }
 //lấy dữ liệu từ bảng physical của mỗi user

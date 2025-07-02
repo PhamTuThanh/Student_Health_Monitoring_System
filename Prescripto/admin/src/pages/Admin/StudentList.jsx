@@ -5,17 +5,6 @@ import { AdminContext } from '../../context/AdminContext';
 import { toast } from 'react-toastify';
 import { useAppContext } from '../../context/AppContext';
 import { generateCohortOptions } from '../../components/ModalCohort'
- 
-
-
-const majors = [
-  'information technology',
-  'transport operation',
-  'architecture',
-  'accounting',
-  'logistic',
-  'automotive',
-];
 
 const StudentList = () => {
   const { backendUrl, aToken } = useContext(AdminContext);
@@ -23,6 +12,7 @@ const StudentList = () => {
   const [selectedCohort, setSelectedCohort] = useState('');
   const [selectedMajor, setSelectedMajor] = useState('');
   const [students, setStudents] = useState([]);
+  const [availableMajors, setAvailableMajors] = useState([]);
   const [loading, setLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [studentsPerPage] = useState(10);
@@ -30,6 +20,24 @@ const StudentList = () => {
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [searchStudentId, setSearchStudentId] = useState(''); 
   const [searchTimeout, setSearchTimeout] = useState(null);
+
+  // Fetch all students to extract unique majors
+  const fetchAllStudents = async () => {
+    try {
+      const { data } = await axios.get(backendUrl + '/api/students');
+      if (data.success && Array.isArray(data.students)) {
+        // Extract unique majors
+        const uniqueMajors = [...new Set(data.students.map(s => s.major))].filter(Boolean);
+        setAvailableMajors(uniqueMajors);
+      }
+    } catch (error) {
+      console.error('Error fetching students for majors:', error);
+    }
+  };
+
+  useEffect(() => {
+    fetchAllStudents();
+  }, []);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -177,7 +185,7 @@ const StudentList = () => {
                 onChange={e => setSelectedMajor(e.target.value)}
               >
                 <option value="">All Majors</option>
-                {majors.map(major => (
+                {availableMajors.map(major => (
                   <option key={major} value={major}>
                     {major.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
                   </option>

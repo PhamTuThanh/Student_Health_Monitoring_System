@@ -540,12 +540,7 @@ export default function PhysicalFitness() {
               <option value="">All</option>
               {majors
                 .slice()
-                .sort((a, b) => {
-                  const numA = parseInt(a.match(/\d+/)?.[0] || '0', 10);
-                  const numB = parseInt(b.match(/\d+/)?.[0] || '0', 10);
-                  if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
-                  return a.toLowerCase().localeCompare(b.toLowerCase(), undefined, { numeric: true });
-                })
+                .sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()))
                 .map(major => (
                   <option key={major} value={major}>{major}</option>
                 ))}

@@ -278,41 +278,110 @@ const getAllPhysicalFitness = async (req, res) => {
 };
 const getPhysicalFitnessStatus = async (req, res) => {
     try {
-        const { examSessionId,cohort } = req.query;
-        const filter = {};
-        console.log(examSessionId);
-        if(examSessionId){
-            filter.examSessionId = examSessionId;
+        const { examSessionId, cohort, major } = req.query;
+        console.log('Received filters:', { examSessionId, cohort, major });
+        
+        if (major && major !== "All" && major !== "") {
+            // When filtering by major, we need to join with users to get student major info
+            const pipeline = [
+                // Match physical fitness records
+                {
+                    $match: {
+                        ...(examSessionId && { examSessionId: new mongoose.Types.ObjectId(examSessionId) }),
+                        ...(cohort && cohort !== "All" && cohort !== "" && { cohort: cohort })
+                    }
+                },
+                // Join with users collection using studentId
+                {
+                    $lookup: {
+                        from: "users",
+                        localField: "studentId", 
+                        foreignField: "studentId",
+                        as: "studentInfo"
+                    }
+                },
+                // Filter by major (case-insensitive)
+                {
+                    $match: {
+                        "studentInfo.major": { $regex: new RegExp(`^${major}$`, 'i') }
+                    }
+                },
+                // Remove the joined studentInfo to keep original structure
+                {
+                    $project: {
+                        studentInfo: 0
+                    }
+                }
+            ];
+            
+            const data = await physicalFitnessModel.aggregate(pipeline);
+            
+            const total = data.length;
+            const daTDSK = data.filter(d => d.height && d.weight).length;
+            const bmiStats = {};
+            let male = 0;
+            let female = 0;
+            
+            // Process aggregated data
+            for (const d of data) {
+                if (d.gender && typeof d.gender === 'string') {
+                    const g = d.gender.trim().toLowerCase();
+                    if (g === 'male' || g === 'Male') male++;
+                    if (g === 'female' || g === 'Female') female++;
+                }
+                if (d.danhGiaBMI) {
+                    bmiStats[d.danhGiaBMI] = (bmiStats[d.danhGiaBMI] || 0) + 1;
+                }
+            }
+            
+            res.json({
+                success: true,
+                total,
+                daTDSK,
+                bmiStats,
+                male,
+                female,
+            });
+        } else {
+            // Simple query without major filter
+            const filter = {};
+            if(examSessionId){
+                filter.examSessionId = examSessionId;
+            }
+            if(cohort && cohort !== "All" && cohort !== ""){
+                filter.cohort = cohort;
+            }
+            
+            const data = await physicalFitnessModel.find(filter);
+            const total = data.length;
+            const daTDSK = data.filter(d=>d.height && d.weight).length;
+            const bmiStats = {};
+            let male = 0;
+            let female = 0;
+            
+            // Đếm số lượng nam/nữ
+            for (const d of data) {
+              if (d.gender && typeof d.gender === 'string') {
+                const g = d.gender.trim().toLowerCase();
+                if (g === 'male' || g === 'Male') male++;
+                if (g === 'female' || g === 'Female') female++;
+              }
+              if (d.danhGiaBMI) {
+                bmiStats[d.danhGiaBMI] = (bmiStats[d.danhGiaBMI] || 0) + 1;
+              }
+            }
+            
+            res.json({
+              success: true,
+              total,
+              daTDSK,
+              bmiStats,
+              male,
+              female,
+            });
         }
-        if(cohort && cohort !== "All" && cohort !== ""){
-            filter.cohort = cohort;
-        }
-        const data = await physicalFitnessModel.find(filter);
-        const total = data.length;
-        const daTDSK = data.filter(d=>d.height && d.weight).length;
-        const bmiStats = {};
-        let male = 0;
-        let female = 0;
-        // Đếm số lượng nam/nữ
-        for (const d of data) {
-          if (d.gender && typeof d.gender === 'string') {
-            const g = d.gender.trim().toLowerCase();
-            if (g === 'male' || g === 'Male') male++;
-            if (g === 'female' || g === 'Female') female++;
-          }
-          if (d.danhGiaBMI) {
-            bmiStats[d.danhGiaBMI] = (bmiStats[d.danhGiaBMI] || 0) + 1;
-          }
-        }
-        res.json({
-          success: true,
-          total,
-          daTDSK,
-          bmiStats,
-          male,
-          female,
-        });
     } catch (error) {
+        console.error('Error in getPhysicalFitnessStatus:', error);
         res.status(500).json({ success: false, message: error.message });
     }
   };

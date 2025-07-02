@@ -264,7 +264,10 @@ const listStudents = async (req, res) => {
         let query = { role: 'student' }; // Filter by role student
         
         if (cohort) query.cohort = cohort;
-        if (major) query.major = major;
+        if (major) {
+            // Case-insensitive matching for major
+            query.major = { $regex: new RegExp(`^${major}$`, 'i') };
+        }
         if (studentId && studentId.trim() !== '') {
             // Use regex for partial matching (case-insensitive)
             query.studentId = { $regex: studentId.trim(), $options: 'i' };
